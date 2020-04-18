@@ -37,8 +37,10 @@ class game
         bool is_check(string);
         /* size = 65 because of \0 */
         char game_board[65];
+        int pawn_promotion = -1;
         bitset<64> white_occupied;
         bitset<64> black_occupied;
+        map<string, bool[2]> castle;
         map<int, bitset<64>, Comparer> target_area;
 };
 

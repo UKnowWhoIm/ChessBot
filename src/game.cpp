@@ -97,6 +97,7 @@ int find_king(char board[65], string player){
     for(int i=0;i<64;i++)
         if(board[i] == target)
             return i;
+    return -1;
 }
 
 bitset<64> get_valid_moves(char board[65], int pos, string player){
@@ -159,6 +160,14 @@ bitset<64> get_valid_moves(char board[65], int pos, string player){
             posns[k++] = -7;
             posns[k++] = 9;
         }
+        if(this->castle[player][0])
+            // Queen Side Castling
+            if(board[pos - 1] == 'f' && board[pos - 2] == 'f' && board[pos - 3] == 'f')
+                posns[k++] = 2;
+        if(this->castle[player][1])
+            // King side castling
+            if(board[pos + 1] == 'f' && board[pos + 2] == 'f')
+                posns[k++] = -2;
         for(int i=0; i < k; i++)
             if( pos + posns[i] >= 0 && pos + posns[i] < 64 )
                 area[63 - (pos + posns[i])] = 1;
@@ -201,6 +210,10 @@ game::game(){
     //constructor
     char board[65] = "rnbqkbnrppppppppffffffffffffffffffffffffffffffffPPPPPPPPRNBQKBNR";
     strcpy(this->game_board, board);
+    this->castle[WHITE][0] = true;
+    this->castle[WHITE][1] = true;
+    this->castle[BLACK][0] = true;
+    this->castle[BLACK][1] = true;
     for(int i=0; i < 64; i++){
         if(this->game_board[i] != 'f' && get_player(this->game_board[i]) == WHITE)
             white_occupied[63-i] = 1;
@@ -211,7 +224,6 @@ game::game(){
     int *black_pieces = get_true_pos(black_occupied);
     int *ptr;
     for(ptr = white_pieces; *ptr != -1; ptr++){
-        cout<<*ptr<<'\n';
         this->target_area[*ptr] = get_valid_moves(this->game_board, *ptr, WHITE);
     }
     for(ptr = black_pieces; *ptr != -1; ptr++)
@@ -256,10 +268,10 @@ bitset<64> game::get_true_target_area(string player){
 
 bool game::is_check(string player){
     int king_pos = find_king(this->game_board, player);
-    return this->get_true_target_area(player)[king_pos];
+    return this->get_true_target_area(reverse_player(player))[63-king_pos];
 }
 
-bool game::make_move(int current, int target, string player, bool _reverse=true){
+bool game::make_move(int current, int target, string player, bool _reverse=false){
     bitset<64> move_board(0);
 
     move_board[63-current] = 1;
@@ -287,9 +299,10 @@ bool game::make_move(int current, int target, string player, bool _reverse=true)
             this->target_area[itr->first] = get_valid_moves(this->game_board, itr->first, get_player(this->game_board[itr->first]));
     bool checked = this->is_check(player);
     if(_reverse || checked){
-        this ->target_area.insert(old_target_area.begin(), old_target_area.end());
-        this ->game_board[current] = this->game_board[target];
-        this->game_board[target] = 'f';
+        this -> target_area.clear();
+        this -> target_area.insert(old_target_area.begin(), old_target_area.end());
+        this -> game_board[current] = this->game_board[target];
+        this -> game_board[target] = 'f';
         if(player == WHITE){
             this->white_occupied[63 - current] = 1;
             this->white_occupied[63 - target] = 0;
@@ -298,7 +311,55 @@ bool game::make_move(int current, int target, string player, bool _reverse=true)
             this->black_occupied[63 - current] = 1;
             this->black_occupied[63 - target] = 0;
         }
-        return checked;
+        return !checked;
+    }
+    if(tolower(board[target]) == 'r'){
+        int left, right;
+        if(player == WHITE){
+            left = 56;
+            right = 63;
+        }
+        else{
+            left = 0;
+            right = 7;
+        }
+        if(current == left)
+            this->castle[0] = false;
+        else if(current == right)
+            this->castle[1] = false;
+    }
+    else if(tolower(board[target]) == 'k'){
+        char rook;
+        if(player == WHITE)
+            rook = 'R';
+        else
+            rook = 'r';
+        if(abs(target - current) == 2){
+            if(target == current - 2 && this->castle[player][0]){
+                // Queen Side
+                this->game_board[target + 1] = rook;
+                this->game_board[target - 2] = 'f';
+            }
+            else{
+                // King Side
+                this->game_board[target - 1] = rook;
+                this->game_board[target + 1] = 'f';
+
+            }
+        }
+
+        this->castle[player][0] = false;
+        this->castle[player][1] = false;
+
+    }
+    else if(tolower(board[i]) == 'p'){
+        int last_rank;
+        if(player == WHITE)
+            last_rank = target < 8 && target >= 0;
+        else
+            last_rank = target > 55 && target < 64;
+        if(last_rank)
+            this -> pawn_promotion = target;
     }
     return true;
 }

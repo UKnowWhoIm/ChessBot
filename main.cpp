@@ -15,6 +15,10 @@ int main()
 {
     game GameObj = game();
     char board[65] = "rnbqkbnrppppppppffffffffffffffffffffffffffffffffPPPPPPPPRNBQKBNR";
-
+    GameObj.make_move(52, 36, WHITE, false);
+    GameObj.make_move(59, 31, WHITE, false);
+    cout<<GameObj.make_move(13, 21, BLACK, false);
+    cout<<GameObj.is_check(BLACK);
+    disp_board(GameObj.get_true_target_area(WHITE));
     return 0;
 }
