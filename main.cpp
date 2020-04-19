@@ -11,14 +11,17 @@ void disp_board(bitset<64> board){
     }
 }
 
+int convert_to_pos(char notation[2]){
+    // Receives chess notation(eg A2) and converts to 'pos'
+    int pos=0;
+    pos += toupper(notation[0]) - 65;
+    // 48 is the corresponding ASCII value of '0'
+    pos += 8 * (8 - (notation[1] - 48));
+    return pos;
+}
+
 int main()
 {
-    game GameObj = game();
-    char board[65] = "rnbqkbnrppppppppffffffffffffffffffffffffffffffffPPPPPPPPRNBQKBNR";
-    GameObj.make_move(52, 36, WHITE, false);
-    GameObj.make_move(59, 31, WHITE, false);
-    cout<<GameObj.make_move(13, 21, BLACK, false);
-    cout<<GameObj.is_check(BLACK);
-    disp_board(GameObj.get_true_target_area(WHITE));
+
     return 0;
 }

@@ -287,27 +287,24 @@ bool game::is_check(string player){
     return this->get_true_target_area(reverse_player(player))[63-king_pos];
 }
 
+
+
 int game::check_game_over(string player){
     // Check if current player is checkmated or game is drawn(If player has no legal move and not in check)
     // 1 -> Game Over => player has lost
     // 0 -> Game Not Over
     // -1 -> Game is drawn
 
-    /*
-     'moves' contain only legal moves
-     If it is null, then the player has no legal moves
-     Implying the game is either lost or drawn
-    */
-
+    // 'moves' contain only legal moves
+    // If it is null, then the player has no legal moves
+    // Implying the game is either lost or drawn
     Move* moves = this->get_all_moves(player, true);
 
-    if(moves == nullptr){
+    if(*moves == -1)
         if(this->is_check(player))
             return 1;
         else
             return -1;
-    }
-    // 'player' has a legal move, implying not a draw or checkmate
     return 0;
 
 }

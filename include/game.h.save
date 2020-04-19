@@ -41,11 +41,10 @@ class game
         bitset<64> get_true_target_area(string);
         bitset<64> get_pseudo_target_area(int);
         bitset<64> get_pseudo_target_area(string);
-        int check_game_over(string);
+        int check_game_over(string, bool);
         int* get_player_posns(string);
         bool make_move(int, int, string, bool, bool);
-        bool is_check(string);
-        int* get_checked_pieces(string);
+        bool is_check(string, bools);
         int en_passant;
         bool game_over;
         string winner;
