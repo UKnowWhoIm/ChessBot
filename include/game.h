@@ -3,6 +3,7 @@
 #include <bitset>
 #include <string>
 #include <cstring>
+#include <math.h>
 #include <cstdlib>
 #include <map>
 #include <iostream>
@@ -25,6 +26,10 @@ struct Move{
     Move(){
         this->next = nullptr;
     }
+    Move(int c, int t){
+        this->current = c;
+        this->target = t;
+    }
 };
 
 void disp_board(bitset<64>);
@@ -46,8 +51,8 @@ class game
         bitset<64> get_true_target_area(string);
         bitset<64> get_pseudo_target_area(int);
         bitset<64> get_pseudo_target_area(string);
-        Move* get_all_moves(string, bool, bool);
-        int check_game_over(string, bool);
+        Move* get_all_moves(string, bool);
+        int check_game_over(string);
         int* get_player_posns(string);
         void set_occupied(string, int, bool);
         bool make_move(int, int, string, bool, bool);
@@ -68,5 +73,6 @@ class game
         map<int, bitset<64>, Comparer> target_area;
 
 };
+Move call_ai(game, string, short int);
 
 #endif // GAME_H

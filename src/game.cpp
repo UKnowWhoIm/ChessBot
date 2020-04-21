@@ -354,7 +354,6 @@ bool game::is_check(string player){
 void game::update_status(string player){
     // Check For CheckMate Or Draw
     int status = 0;//this->check_game_over(reverse_player(player));
-    cout<<status<<endl;
     if(status == 1){
         this->game_over = true;
         this->winner = player;
@@ -391,7 +390,7 @@ void game::set_occupied(string player, int index, bool val){
         this->black_occupied[63- index] = val;
 }
 
-int game::check_game_over(string player, bool debug){
+int game::check_game_over(string player){
     // Check if current player is checkmated or game is drawn(If player has no legal move and not in check)
     // 1 -> Game Over => player has lost
     // 0 -> Game Not Over
@@ -403,7 +402,7 @@ int game::check_game_over(string player, bool debug){
      Implying the game is either lost or drawn
     */
 
-    Move* moves = this->get_all_moves(player, true, debug);
+    Move* moves = this->get_all_moves(player, true);
 
     if(moves == nullptr){
         if(this->is_check(player))
@@ -416,7 +415,7 @@ int game::check_game_over(string player, bool debug){
 
 }
 
-Move* game::get_all_moves(string player, bool legal, bool debug){
+Move* game::get_all_moves(string player, bool legal){
     Move *moves = nullptr;
     int *temp = nullptr;
     for(int i=0; i < 64; i++){
@@ -424,13 +423,8 @@ Move* game::get_all_moves(string player, bool legal, bool debug){
             temp = get_true_pos(this->get_true_target_area(i, player));
             for(; *temp != -1; temp++){
                 if(legal)
-                    if(!this->make_move(i, *temp, player, true, false)){
-                        if(debug)
-                            cout<<"Skipped "<<i<<' '<<*temp<<endl;
+                    if(!this->make_move(i, *temp, player, true, false))
                         continue;
-                    }
-                if(debug)
-                    cout<<"Evaluated "<<i<<' '<<*temp<<endl;
                 Move *temp_move = new Move;
                 temp_move->current = i;
                 temp_move->target = *temp;
@@ -568,7 +562,6 @@ bool game::make_move(int current, int target, string player, bool _reverse, bool
             this->en_passant = target + 8 * -dirn;
         else
             this->en_passant = -1;
-        cout<<endl<<initial_move<<" WTFFFFFFFFF "<<' '<<this->en_passant<<endl;
     }
     else
         this->en_passant = -1;
@@ -583,5 +576,81 @@ bool game::make_move(int current, int target, string player, bool _reverse, bool
 game::~game()
 {
     //destructor
+}
+
+
+// AI functions
+void set_piece_vals(map<char,int> &piece_vals, string max_player){
+    int multiplier = 1; // By default max_player is black
+    if(max_player == WHITE)
+        multiplier = -1;
+    // BLACK
+    piece_vals['p'] = multiplier * 50;
+    piece_vals['n'] = multiplier * 200;
+    piece_vals['b'] = multiplier * 300;
+    piece_vals['r'] = multiplier * 500;
+    piece_vals['q'] = multiplier * 1000;
+    piece_vals['k'] = multiplier * pow(10, 7);
+    // WHITE
+    piece_vals['P'] = multiplier * -50;
+    piece_vals['N'] = multiplier * -200;
+    piece_vals['B'] = multiplier * -300;
+    piece_vals['R'] = multiplier * -500;
+    piece_vals['Q'] = multiplier * -1000;
+    piece_vals['K'] = multiplier * -1 * pow(10, 7);
+}
+
+signed int heuristic(game GameObj, string player, string max_player){
+    map<char, int> piece_vals;
+    int score = 0;
+    set_piece_vals(piece_vals, max_player);
+    for(int i = 0; i < 64; i++)
+        score += piece_vals[GameObj.game_board[i]];
+    return score;
+}
+
+int minimax(game GameObj, string max_player, string player, bool is_max, short int depth, int alpha, int beta){
+    if(depth == 0)
+        return heuristic(GameObj, player, max_player);
+    int val;
+    Move *temp = GameObj.get_all_moves(player, false);
+    if(is_max){
+        for(;temp != nullptr; temp=temp->next){
+            GameObj.make_move(temp->current, temp->target, player, false, true);
+            val = minimax(GameObj, max_player,reverse_player(player), false, depth - 1, alpha, beta);
+            alpha = val > alpha ? val : alpha;
+            if(beta <= alpha)
+                break;
+        }
+        return alpha;
+    }
+    else{
+        for(;temp != nullptr; temp=temp->next){
+            GameObj.make_move(temp->current, temp->target, player, false, true);
+            val = minimax(GameObj, max_player, reverse_player(player), true, depth - 1, alpha, beta);
+            beta = beta > val ? val : beta;
+            if(beta <= alpha)
+                break;
+        }
+        return beta;
+    }
+}
+
+Move call_ai(game GameObj, string player, short int depth){
+    int beta = pow(10, 5);
+    int alpha = -1 * pow(10, 5);
+    int temp_val;
+    Move move_pos(-1, -1);
+
+    Move *temp = GameObj.get_all_moves(player, false);
+    for(;temp != nullptr; temp=temp->next){
+        GameObj.make_move(temp->current, temp->target, player, false, true);
+        temp_val = minimax(GameObj, player, reverse_player(player), false, depth - 1, alpha, beta);
+        if(temp_val > alpha){
+            move_pos.current = temp->current;
+            move_pos.target = temp->target;
+        }
+    }
+    return move_pos;
 }
 

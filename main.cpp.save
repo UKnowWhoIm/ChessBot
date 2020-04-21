@@ -33,23 +33,12 @@ void get_status(game GameObj, string player){
     cout<<"\nWinner: "<<GameObj.winner<<endl;
 }
 
+void change(game a){
+    a.make_move(48, 40, WHITE, )
+}
+
 int main()
 {
-    game GameObj;
-    int current, target;
-    char c[2],b[2];
-    bool status;
-    string player = WHITE;
-    GameObj.make_move(62, 47, WHITE, false, false);
-    GameObj.make_move(54, 38, WHITE, false, false);
-    GameObj.make_move(61, 54, WHITE, false, false);
-    GameObj.make_move(60, 62, WHITE, false, false);
-    GameObj.make_move(1, 16, BLACK, false, false);
-    GameObj.make_move(1, 16, BLACK, false, false);
-    
-    cout<<endl<<GameObj.castle[WHITE][0]<<' '<<GameObj.castle[WHITE][1];
-    cout<<endl<<GameObj.castle[BLACK][0]<<' '<<GameObj.castle[BLACK][1];
-    disp_board(GameObj.game_board);
     /*
     while(!GameObj.game_over){
         get_status(GameObj, player);
@@ -78,5 +67,7 @@ int main()
             cout<<"\n\nERROR\n\n";
     }
     */
+    game GameObj;
+    change(GameObj);
     return 0;
 }
