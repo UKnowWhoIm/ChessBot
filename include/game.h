@@ -27,12 +27,17 @@ struct Move{
     }
 };
 
+void disp_board(bitset<64>);
+// For debugging purposes only, Delete in production
 bitset<64> get_valid_moves(char[65], int, string);
+int* get_true_pos(bitset<64>);
+string reverse_player(string);
 
 class game
 {
     public:
         game();
+        game(const game&);
         //game(char[65])
         virtual ~game();
         bitset<64> get_occupied(string);
@@ -41,22 +46,26 @@ class game
         bitset<64> get_true_target_area(string);
         bitset<64> get_pseudo_target_area(int);
         bitset<64> get_pseudo_target_area(string);
-        int check_game_over(string);
+        Move* get_all_moves(string, bool, bool);
+        int check_game_over(string, bool);
         int* get_player_posns(string);
         bool make_move(int, int, string, bool, bool);
         bool is_check(string);
         int* get_checked_pieces(string);
+        bool promote_pawn(int, char, string, bool);
+        void update_status(string);
         int en_passant;
         bool game_over;
+        bool checked;
         string winner;
         // size = 65 because of \0
         char game_board[65];
-        int pawn_promotion = -1;
+        int pawn_promotion;
         bitset<64> white_occupied;
         bitset<64> black_occupied;
         map<string, bool[2]> castle;
         map<int, bitset<64>, Comparer> target_area;
-        Move* get_all_moves(string, bool);
+
 };
 
 #endif // GAME_H

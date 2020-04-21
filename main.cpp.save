@@ -55,13 +55,8 @@ int main()
         status = GameObj.make_move(current, target, player, false, false);
         if(status){
             if(GameObj.pawn_promotion != -1){
-                char piece;
-                bool result = false;
-                while(!result){
-                    cout<<"\nEnter Piece For Promotion: ";
-                    cin>>piece;
-                    result = GameObj.promote_pawn(target, piece, player, false);
-                }
+                
+                while()
             }
             player = reverse_player(player);
         }
