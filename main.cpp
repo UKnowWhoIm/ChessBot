@@ -40,8 +40,21 @@ int main()
     char c[2],b[2];
     bool status;
     string player = WHITE;
-    //GameObj.make_move(48, 24, WHITE, false, true);
-    //GameObj.make_move(9, 25, BLACK, false, false);
+    GameObj.make_move(62, 47, WHITE, false, false);
+    GameObj.make_move(54, 38, WHITE, false, false);
+    GameObj.make_move(61, 54, WHITE, false, false);
+    GameObj.make_move(60, 62, WHITE, false, false);
+    GameObj.make_move(1, 16, BLACK, false, false);
+    GameObj.make_move(11, 27, BLACK, false, false);
+    GameObj.make_move(3, 19, BLACK, false, false);
+    GameObj.make_move(2, 11, BLACK, false, false);
+    GameObj.make_move(4, 2, BLACK, false, false);
+    disp_board(GameObj.black_occupied);
+
+    cout<<endl<<GameObj.castle[WHITE][0]<<' '<<GameObj.castle[WHITE][1];
+    cout<<endl<<GameObj.castle[BLACK][0]<<' '<<GameObj.castle[BLACK][1];
+    disp_board(GameObj.game_board);
+    /*
     while(!GameObj.game_over){
         get_status(GameObj, player);
         disp_board(GameObj.game_board);
@@ -68,5 +81,6 @@ int main()
         else
             cout<<"\n\nERROR\n\n";
     }
+    */
     return 0;
 }

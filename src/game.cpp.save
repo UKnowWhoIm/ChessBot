@@ -175,11 +175,11 @@ bitset<64> get_valid_moves(char board[65], int pos, string player, map<string, b
         if(castle[player][0])
             // Queen Side Castling
             if(board[pos - 1] == 'f' && board[pos - 2] == 'f' && board[pos - 3] == 'f')
-                posns[k++] = 2;
+                posns[k++] = -2;
         if(castle[player][1])
             // King side castling
             if(board[pos + 1] == 'f' && board[pos + 2] == 'f')
-                posns[k++] = -2;
+                posns[k++] = 2;
         for(int i=0; i < k; i++)
             if( pos + posns[i] >= 0 && pos + posns[i] < 64 )
                 area[63 - (pos + posns[i])] = 1;
@@ -232,10 +232,8 @@ game::game(){
     this->game_over = false;
     this->winner = "";
     for(int i=0; i < 64; i++){
-        if(this->game_board[i] != 'f' && get_player(this->game_board[i]) == WHITE)
-            this->white_occupied[63-i] = 1;
-        else if(this->game_board[i] != 'f' && get_player(this->game_board[i]) == BLACK)
-            this->black_occupied[63-i] = 1;
+        if(this->game_board[i] != 'f')
+            this->set_occupied(get_player(this->game_board[i]), i, 1);
     }
     int *white_pieces = get_true_pos(white_occupied);
     int *black_pieces = get_true_pos(black_occupied);
@@ -317,9 +315,9 @@ bitset<64> game::get_true_target_area(int pos, string player){
             area[63-(pos + 8*dirn + 1)] = 1;
         // EN PASSANT
         if(tolower(this->game_board[pos - 1]) == 'p' && get_player(this->game_board[pos - 1]) == reverse_player(player) && can_go_left(pos) && this->en_passant != -1)
-            area[63 - (pos - 1)] = 1;
+            area[63 - (pos - 1 + 8 * dirn)] = 1;
         if(tolower(this->game_board[pos + 1]) == 'p' && get_player(this->game_board[pos + 1]) == reverse_player(player) && can_go_right(pos) && this->en_passant != -1)
-            area[63 - (pos + 1)] = 1;
+            area[63 - (pos + 1 + 8 * dirn)] = 1;
         return area;
     }
     return this->target_area.at(pos) & ~this->get_occupied(player);
@@ -386,6 +384,13 @@ bool game::promote_pawn(int current, char piece, string player, bool ai=false){
     return false;
 }
 
+void game::set_occupied(string player, int index, bool val){
+    if(player == WHITE)
+        this->white_occupied[63- index] = val;
+    else if(player == BLACK)
+        this->black_occupied[63- index] = val;
+}
+
 int game::check_game_over(string player, bool debug){
     // Check if current player is checkmated or game is drawn(If player has no legal move and not in check)
     // 1 -> Game Over => player has lost
@@ -441,7 +446,7 @@ bool game::make_move(int current, int target, string player, bool _reverse, bool
     if(!ai){
         if(get_player(this->game_board[current]) != player)
             return false;
-        if(!this->target_area.at(current)[63 - target])
+        if(!this->get_true_target_area(current, player)[63 - target])
             return false;
     }
     bitset<64> move_board(0);
@@ -452,18 +457,11 @@ bool game::make_move(int current, int target, string player, bool _reverse, bool
     char old_piece = this->game_board[target];
     this->game_board[target] = this->game_board[current];
     this->game_board[current] = 'f';
-    if(player == WHITE){
-        this->white_occupied[63 - current] = 0;
-        this->white_occupied[63 - target] = 1;
-        // Essential For Captures
-        this->black_occupied[63 - target] = 0;
-    }
-    else{
-        this->black_occupied[63 - current] = 0;
-        this->black_occupied[63 - target] = 1;
-        // Essential For Captures
-        this->white_occupied[63 - target] = 0;
-    }
+
+    this->set_occupied(player, target, 1);
+    this->set_occupied(player, current, 0);
+    // Essential For Captures
+    this->set_occupied(reverse_player(player), target, 0);
     map<int, bitset<64>,Comparer> old_target_area;
     old_target_area.insert(this->target_area.begin(), this->target_area.end());
     this->target_area[target] = get_valid_moves(this->game_board, target, player, this->castle);
@@ -483,21 +481,12 @@ bool game::make_move(int current, int target, string player, bool _reverse, bool
         this -> target_area.insert(old_target_area.begin(), old_target_area.end());
         this -> game_board[current] = this->game_board[target];
         this -> game_board[target] = old_piece;
-        if(player == WHITE){
-            this->white_occupied[63 - current] = 1;
-            this->white_occupied[63 - target] = 0;
-            if(old_piece != 'f')
-                this->black_occupied[63 - target] = 1;
-        }
-        else{
-            this->black_occupied[63 - current] = 1;
-            this->black_occupied[63 - target] = 0;
-            if(old_piece != 'f')
-                this->white_occupied[63 - target] = 1;
-        }
+        this -> set_occupied(player, current, 1);
+        this -> set_occupied(player, target, 0);
+        if(old_piece != 'f')
+            this -> set_occupied(reverse_player(player), current, 1);
         return !checked_;
     }
-    cout<<
     if(tolower(this->game_board[target]) == 'r'){
         int left, right;
         if(player == WHITE){
@@ -524,12 +513,19 @@ bool game::make_move(int current, int target, string player, bool _reverse, bool
                 // Queen Side
                 this->game_board[target + 1] = rook;
                 this->game_board[target - 2] = 'f';
+                this->target_area[target + 1] = get_valid_moves(this->game_board, target + 1,  player, this->castle);
+                this->set_occupied(player, target - 2, 0);
+                this->set_occupied(player, target + 1, 1);
+                this->target_area.erase(target - 2);
             }
             else{
                 // King Side
                 this->game_board[target - 1] = rook;
                 this->game_board[target + 1] = 'f';
-
+                this->target_area[target - 1] = get_valid_moves(this->game_board, target - 1,  player, this->castle);
+                this->set_occupied(player, target - 1, 1);
+                this->set_occupied(player, target + 1, 0);
+                this->target_area.erase(target + 1);
             }
         }
         this->castle[player][0] = false;
@@ -548,15 +544,18 @@ bool game::make_move(int current, int target, string player, bool _reverse, bool
             last_rank = target > 55 && target < 64;
             dirn = 1;
         }
-        if(last_rank)
+        if(last_rank){
             this -> pawn_promotion = target;
-        return true;
-
+            return true;
+        }
         // Implementing En Passant
         // En Passant doesn't affect legality of the move, so checking for check b4 implementing it is not a problem
         if(this->en_passant != -1)
-            if(target == this->en_passant)
+            if(target == this->en_passant){
                 this->game_board[target + 8 * -dirn] = 'f';
+                this->set_occupied(reverse_player(player), target + 8 * -dirn, 0);
+                this->
+            }
 
 
         // Setting Up En Passant

@@ -49,6 +49,7 @@ class game
         Move* get_all_moves(string, bool, bool);
         int check_game_over(string, bool);
         int* get_player_posns(string);
+        void set_occupied(string, int, bool);
         bool make_move(int, int, string, bool, bool);
         bool is_check(string);
         int* get_checked_pieces(string);
