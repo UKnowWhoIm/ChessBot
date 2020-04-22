@@ -75,7 +75,7 @@ string reverse_player(string player){
     return WHITE;
 }
 
-bitset<64> move_generator(char board[65], int pos, Updation updation[4], int valid_updations){
+bitset<64> move_generator(string board, int pos, Updation updation[4], int valid_updations){
     int pos_temp;
     bitset<64> area (0);
     for(int i=0, k=0; i < valid_updations; i++){
@@ -94,7 +94,7 @@ bitset<64> move_generator(char board[65], int pos, Updation updation[4], int val
 
 
 
-int find_king(char board[65], string player){
+int find_king(string board, string player){
     char target;
     if(player == WHITE)
         target = 'K';
@@ -106,7 +106,7 @@ int find_king(char board[65], string player){
     return -1;
 }
 
-bitset<64> get_valid_moves(char board[65], int pos, string player, map<string, bool[2]> castle){
+bitset<64> get_valid_moves(string board, int pos, string player, map<string, bool[2]> castle){
     bitset<64> area (0);
     if(tolower(board[pos]) == 'p'){
         int dirn;
@@ -220,8 +220,7 @@ bitset<64> get_valid_moves(char board[65], int pos, string player, map<string, b
 
 game::game(){
     //constructor
-    char board[65] = "rnbqkbnrppppppppffffffffffffffffffffffffffffffffPPPPPPPPRNBQKBNR";
-    strcpy(this->game_board, board);
+    this->game_board = "rnbqkbnrppppppppffffffffffffffffffffffffffffffffPPPPPPPPRNBQKBNR";
     this->castle[WHITE][0] = true;
     this->castle[WHITE][1] = true;
     this->castle[BLACK][0] = true;
@@ -248,7 +247,7 @@ game::game(){
 game::game(const game &old){
     // Copy Constructor
 
-    strcpy(this->game_board, old.game_board);
+    this->game_board = old.game_board;
     this->castle.insert(old.castle.begin(), old.castle.end());
     this->en_passant = old.en_passant;
     this->game_over = old.game_over;
@@ -443,6 +442,7 @@ bool game::make_move(int current, int target, string player, bool _reverse, bool
         if(!this->get_true_target_area(current, player)[63 - target])
             return false;
     }
+
     bitset<64> move_board(0);
 
     move_board[63-current] = 1;
@@ -597,38 +597,48 @@ void set_piece_vals(map<char,int> &piece_vals, string max_player){
     piece_vals['B'] = multiplier * -300;
     piece_vals['R'] = multiplier * -500;
     piece_vals['Q'] = multiplier * -1000;
-    piece_vals['K'] = multiplier * -pow(10, 7);
+    piece_vals['K'] = multiplier * -1 * pow(10, 7);
 }
 
-signed int heuristic(game GameObj, string player, string max_player){
+signed int heuristic(game GameObj, string player, string max_player, int& i){
     map<char, int> piece_vals;
     int score = 0;
     set_piece_vals(piece_vals, max_player);
     for(int i = 0; i < 64; i++)
         score += piece_vals[GameObj.game_board[i]];
+    i++;
     return score;
 }
 
-int minimax(game GameObj, string max_player, string player, bool is_max, short int depth, int alpha, int beta){
+int minimax(game GameObj, string max_player, string player, bool is_max, short int depth, int alpha, int beta, int &i){
     if(depth == 0)
-        return heuristic(GameObj, player, max_player);
+        return heuristic(GameObj, player, max_player, i);
 
+    int val;
     Move *temp = GameObj.get_all_moves(player, false);
     if(is_max){
         for(;temp != nullptr; temp=temp->next){
             GameObj.make_move(temp->current, temp->target, player, false, true);
-            alpha = max(minimax(GameObj, max_player,reverse_player(player), false, depth - 1, alpha, beta), alpha);
+            val = minimax(GameObj, max_player,reverse_player(player), false, depth - 1, alpha, beta, i);
+            alpha = val >= alpha ? val : alpha;
             if(beta <= alpha)
                 break;
+        }
+        if(alpha == -1*pow(10, 5)){
+            // No moves
         }
         return alpha;
     }
     else{
         for(;temp != nullptr; temp=temp->next){
             GameObj.make_move(temp->current, temp->target, player, false, true);
-            beta = min(minimax(GameObj, max_player, reverse_player(player), true, depth - 1, alpha, beta), alpha);
+            val = minimax(GameObj, max_player, reverse_player(player), true, depth - 1, alpha, beta, i);
+            beta = beta > val ? val : beta;
             if(beta <= alpha)
                 break;
+        }
+        if(beta == pow(10, 5)){
+            // No moves
         }
         return beta;
     }
@@ -636,20 +646,21 @@ int minimax(game GameObj, string max_player, string player, bool is_max, short i
 
 Move call_ai(game GameObj, string player, short int depth){
     int beta = pow(10, 5);
-    int alpha = pow(10, -5);
+    int alpha = -1 * pow(10, 5);
     int temp_val;
     Move move_pos(-1, -1);
-
     Move *temp = GameObj.get_all_moves(player, false);
+    int i=0;
     for(;temp != nullptr; temp=temp->next){
+        i++;
         GameObj.make_move(temp->current, temp->target, player, false, true);
-        temp_val = minimax(GameObj, player, reverse_player(player), false, depth - 1, alpha, beta);
-        co
+        temp_val = minimax(GameObj, player, reverse_player(player), false, depth - 1, alpha, beta, i);
         if(temp_val > alpha){
             move_pos.current = temp->current;
             move_pos.target = temp->target;
         }
     }
+    cout<<"Nodes "<<i;
     return move_pos;
 }
 

@@ -2,11 +2,11 @@
 #define GAME_H
 #include <bitset>
 #include <string>
-#include <cstring>
 #include <math.h>
 #include <cstdlib>
 #include <map>
 #include <iostream>
+#include <chrono>
 
 using namespace std;
 
@@ -34,7 +34,7 @@ struct Move{
 
 void disp_board(bitset<64>);
 // For debugging purposes only, Delete in production
-bitset<64> get_valid_moves(char[65], int, string);
+bitset<64> get_valid_moves(string, int, string);
 int* get_true_pos(bitset<64>);
 string reverse_player(string);
 
@@ -64,8 +64,7 @@ class game
         bool game_over;
         bool checked;
         string winner;
-        // size = 65 because of \0
-        char game_board[65];
+        string game_board;
         int pawn_promotion;
         bitset<64> white_occupied;
         bitset<64> black_occupied;
