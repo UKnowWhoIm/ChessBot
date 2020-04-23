@@ -606,6 +606,7 @@ signed int heuristic(game GameObj, string player, string max_player, int& i){
     set_piece_vals(piece_vals, max_player);
     for(int i = 0; i < 64; i++)
         score += piece_vals[GameObj.game_board[i]];
+    
     i++;
     return score;
 }
@@ -620,7 +621,7 @@ int minimax(game GameObj, string max_player, string player, bool is_max, short i
         for(;temp != nullptr; temp=temp->next){
             GameObj.make_move(temp->current, temp->target, player, false, true);
             val = minimax(GameObj, max_player,reverse_player(player), false, depth - 1, alpha, beta, i);
-            alpha = val >= alpha ? val : alpha;
+            alpha = val > alpha ? val : alpha;
             if(beta <= alpha)
                 break;
         }
@@ -658,6 +659,7 @@ Move call_ai(game GameObj, string player, short int depth){
         if(temp_val > alpha){
             move_pos.current = temp->current;
             move_pos.target = temp->target;
+            alpha = temp_val;
         }
     }
     cout<<"Nodes "<<i;

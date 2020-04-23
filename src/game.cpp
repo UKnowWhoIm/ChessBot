@@ -606,13 +606,15 @@ signed int heuristic(game GameObj, string player, string max_player, int& i){
     set_piece_vals(piece_vals, max_player);
     for(int i = 0; i < 64; i++)
         score += piece_vals[GameObj.game_board[i]];
+
     i++;
     return score;
 }
 
 int minimax(game GameObj, string max_player, string player, bool is_max, short int depth, int alpha, int beta, int &i){
-    if(depth == 0)
+    if(depth == 0){
         return heuristic(GameObj, player, max_player, i);
+    }
 
     int val;
     Move *temp = GameObj.get_all_moves(player, false);
