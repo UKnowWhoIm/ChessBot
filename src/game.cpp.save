@@ -248,24 +248,24 @@ game::game(){
     int *black_pieces = get_true_pos(black_occupied);
     int *ptr;
     for(ptr = white_pieces; *ptr != -1; ptr++){
-        this->target_area[*ptr] = get_valid_moves(this->game_board, *ptr, WHITE, this->castle);
+        this->target_areas[*ptr] = get_valid_moves(this->game_board, *ptr, WHITE, this->castle);
     }
     for(ptr = black_pieces; *ptr != -1; ptr++)
-        this->target_area[*ptr] = get_valid_moves(this->game_board, *ptr, BLACK, this->castle);
+        this->target_areas[*ptr] = get_valid_moves(this->game_board, *ptr, BLACK, this->castle);
 }
 
 game::game(const game &old){
     // Copy Constructor
     temp_count++;
     this->game_board = old.game_board;
-    this->castle.insert(old.castle.begin(), old.castle.end());
+    //this->castle.insert(old.castle.begin(), old.castle.end());
     this->en_passant = old.en_passant;
     this->game_over = old.game_over;
     this->checked = old.checked;
     this->winner = old.winner;
     this->black_occupied = old.black_occupied;
     this->white_occupied = old.white_occupied;
-    this->target_area.insert(old.target_area.begin(), old.target_area.end());
+    //this->target_area.insert(old.target_area.begin(), old.target_area.end());
     this->pawn_promotion = old.pawn_promotion;
 }
 
@@ -283,7 +283,7 @@ bitset<64> game::get_occupied(){
 
 bitset<64> game::get_pseudo_target_area(int pos){
     // Get pseudo target area of a particular piece
-    return this->target_area.at(pos);
+    return this->target_areas[pos];
 }
 
 bitset<64> game::get_pseudo_target_area(string player){
@@ -291,7 +291,7 @@ bitset<64> game::get_pseudo_target_area(string player){
     bitset<64> area (0);
     int *posns = get_true_pos(this->get_occupied(player));
     for(;*posns != -1; posns++)
-        area |= this->target_area.at(*posns);
+        area |= this->target_areas[*posns];
     return area;
 }
 
@@ -329,7 +329,7 @@ bitset<64> game::get_true_target_area(int pos, string player){
             area[63 - (pos + 1 + 8 * dirn)] = 1;
         return area;
     }
-    return this->target_area.at(pos) & ~this->get_occupied(player);
+    return this->target_areas[pos] & ~this->get_occupied(player);
 }
 
 bitset<64> game::get_true_target_area(string player){
@@ -345,7 +345,7 @@ int* game::get_checked_pieces(string player){
     int king_pos = find_king(this->game_board, player);
     int arr[16], k=0;
     for(int i=0;i<64;i++)
-        if (get_player(this->game_board[i]) == reverse_player(player) && target_area[i][63-king_pos])
+        if (get_player(this->game_board[i]) == reverse_player(player) && target_areas[i][63-king_pos])
            arr[k++] = i;
     arr[k] = -1; // To indicate end of arr
     int* pieces = arr;
@@ -381,7 +381,7 @@ bool game::promote_pawn(int current, char piece, string player, bool ai=false){
             else
                 piece = tolower(piece);
             this->game_board[current] = piece;
-            this->target_area[current] = get_valid_moves(this->game_board, current, player, this->castle);
+            this->target_areas[current] = get_valid_moves(this->game_board, current, player, this->castle);
             if(!ai){
                 this->update_status(player);
                 this->checked = this->is_check(player);
@@ -466,23 +466,22 @@ bool game::make_move(int current, int target, string player, bool _reverse, bool
     this->set_occupied(player, current, 0);
     // Essential For Captures
     this->set_occupied(reverse_player(player), target, 0);
-    map<int, bitset<64>,Comparer> old_target_area;
-    old_target_area.insert(this->target_area.begin(), this->target_area.end());
-    this->target_area[target] = get_valid_moves(this->game_board, target, player, this->castle);
-    this->target_area.erase(current);
-    map<int, bitset<64>,Comparer>::iterator itr;
-    for(itr = this->target_area.begin(); itr != this->target_area.end(); itr++)
-        if((itr->second & move_board).any())
+    array <bitset<64>, 64> old_target_area;
+    old_target_area = this->target_areas;
+    this->target_areas[target] = get_valid_moves(this->game_board, target, player, this->castle);
+    this->target_areas[current] = 0;
+
+    for(int i = 0; i < 64; i++)
+        if((this->target_areas[i] & move_board).any())
             //update target_area
-            this->target_area[itr->first] = get_valid_moves(this->game_board, itr->first, get_player(this->game_board[itr->first]), this->castle);
+            this->target_areas[i] = get_valid_moves(this->game_board, i, get_player(this->game_board[i]), this->castle);
     bool checked_;
     if (!ai)
         checked_ = this->is_check(player);
     else
         checked_ = false;
     if(_reverse || checked_){
-        this -> target_area.clear();
-        this -> target_area.insert(old_target_area.begin(), old_target_area.end());
+        this -> target_areas = old_target_area;
         this -> game_board[current] = this->game_board[target];
         this -> game_board[target] = old_piece;
         this -> set_occupied(player, current, 1);
@@ -517,19 +516,19 @@ bool game::make_move(int current, int target, string player, bool _reverse, bool
                 // Queen Side
                 this->game_board[target + 1] = rook;
                 this->game_board[target - 2] = 'f';
-                this->target_area[target + 1] = get_valid_moves(this->game_board, target + 1,  player, this->castle);
+                this->target_areas[target + 1] = get_valid_moves(this->game_board, target + 1,  player, this->castle);
                 this->set_occupied(player, target - 2, 0);
                 this->set_occupied(player, target + 1, 1);
-                this->target_area.erase(target - 2);
+                this->target_areas[target - 2] = 0;
             }
             else{
                 // King Side
                 this->game_board[target - 1] = rook;
                 this->game_board[target + 1] = 'f';
-                this->target_area[target - 1] = get_valid_moves(this->game_board, target - 1,  player, this->castle);
+                this->target_areas[target - 1] = get_valid_moves(this->game_board, target - 1,  player, this->castle);
                 this->set_occupied(player, target - 1, 1);
                 this->set_occupied(player, target + 1, 0);
-                this->target_area.erase(target + 1);
+                this->target_areas[target + 1] = 0;
             }
         }
         this->castle[player][0] = false;
@@ -558,7 +557,7 @@ bool game::make_move(int current, int target, string player, bool _reverse, bool
             if(target == this->en_passant){
                 this->game_board[target + 8 * -dirn] = 'f';
                 this->set_occupied(reverse_player(player), target + 8 * -dirn, 0);
-                this->target_area.erase(target + 8 * -dirn);
+                this->target_areas.erase(target + 8 * -dirn);
             }
 
 

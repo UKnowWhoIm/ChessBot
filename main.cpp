@@ -36,7 +36,6 @@ int main()
     Move a;
     int target, current;
     bool status;
-    /*
     while(!GameObj.game_over){
         disp_board(GameObj.game_board);
         cout<<"\n"<<player<<"\'s Turn";
@@ -77,7 +76,7 @@ int main()
         else
             cout<<"\n\nERROR\n\n";
     }
-    */
+/*
     game tempObj;
     auto start = high_resolution_clock::now();
     for(int j=0;j<58279;j++)
@@ -87,14 +86,6 @@ int main()
     cout<<endl<<duration.count()<<endl;
     array<bitset<64>,64> target_arr;
     array<bitset<64>,64> dummy;
-    auto sstart = high_resolution_clock::now();
-    for(int j=0;j<58279;j++)
-        target_arr = dummy;
-    auto sstop = high_resolution_clock::now();
-    auto sduration = duration_cast<milliseconds>(sstop - sstart);
-    cout<<sduration.count();
-    dummy[1] = 8;
-    target_arr[1] = 64;
-    cout<<endl<<dummy[1]<<' '<<target_arr[1];
+    */
     return 0;
 }

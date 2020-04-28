@@ -70,7 +70,8 @@ class game
         bitset<64> white_occupied;
         bitset<64> black_occupied;
         map<string, bool[2]> castle;
-        map<int, bitset<64>, Comparer> target_area;
+        // map<int, bitset<64>, Comparer> target_area;
+        array <bitset<64>, 64> target_areas;
 
 };
 Move call_ai(game, string, short int);
