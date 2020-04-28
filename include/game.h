@@ -4,6 +4,7 @@
 #include <string>
 #include <math.h>
 #include <cstdlib>
+#include <bits/stdc++.h>
 #include <map>
 #include <iostream>
 #include <chrono>
@@ -64,12 +65,14 @@ class game
         int en_passant;
         bool game_over;
         bool checked;
+        array<bool, 2> white_castle;
+        array<bool, 2> black_castle;
         string winner;
         string game_board;
         int pawn_promotion;
         bitset<64> white_occupied;
         bitset<64> black_occupied;
-        map<string, bool[2]> castle;
+        //map<string, bool[2]> castle;
         // map<int, bitset<64>, Comparer> target_area;
         array <bitset<64>, 64> target_areas;
 

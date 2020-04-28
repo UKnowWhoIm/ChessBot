@@ -15,7 +15,7 @@ game::game(char board[64])
 
 }
 */
-int temp_count = 0;
+int nodes = 0;
 
 struct Updation{
     int updation;
@@ -116,7 +116,7 @@ int find_king(string board, string player){
     return -1;
 }
 
-bitset<64> get_valid_moves(string board, int pos, string player, map<string, bool[2]> castle){
+bitset<64> get_valid_moves(string board, int pos, string player, array<bool, 2> white_castle, array<bool, 2> black_castle){
     bitset<64> area (0);
     if(tolower(board[pos]) == 'p'){
         int dirn;
@@ -182,11 +182,11 @@ bitset<64> get_valid_moves(string board, int pos, string player, map<string, boo
             posns[k++] = -7;
             posns[k++] = 9;
         }
-        if(castle[player][0])
+        if((white_castle[0] && player == WHITE) || (black_castle[0] && player == BLACK))
             // Queen Side Castling
             if(board[pos - 1] == 'f' && board[pos - 2] == 'f' && board[pos - 3] == 'f')
                 posns[k++] = -2;
-        if(castle[player][1])
+        if((white_castle[1] && player == WHITE) || (black_castle[1] && player == BLACK))
             // King side castling
             if(board[pos + 1] == 'f' && board[pos + 2] == 'f')
                 posns[k++] = 2;
@@ -231,10 +231,8 @@ bitset<64> get_valid_moves(string board, int pos, string player, map<string, boo
 game::game(){
     //constructor
     this->game_board = "rnbqkbnrppppppppffffffffffffffffffffffffffffffffPPPPPPPPRNBQKBNR";
-    this->castle[WHITE][0] = true;
-    this->castle[WHITE][1] = true;
-    this->castle[BLACK][0] = true;
-    this->castle[BLACK][1] = true;
+    this->white_castle = {true, true};
+    this->black_castle = {true, true};
     this->en_passant = -1;
     this->checked = false;
     this->pawn_promotion = -1;
@@ -248,17 +246,17 @@ game::game(){
     int *black_pieces = get_true_pos(black_occupied);
     int *ptr;
     for(ptr = white_pieces; *ptr != -1; ptr++){
-        this->target_areas[*ptr] = get_valid_moves(this->game_board, *ptr, WHITE, this->castle);
+        this->target_areas[*ptr] = get_valid_moves(this->game_board, *ptr, WHITE, this->white_castle, this->black_castle);
     }
     for(ptr = black_pieces; *ptr != -1; ptr++)
-        this->target_areas[*ptr] = get_valid_moves(this->game_board, *ptr, BLACK, this->castle);
+        this->target_areas[*ptr] = get_valid_moves(this->game_board, *ptr, BLACK, this->white_castle, this->black_castle);
 }
 
 game::game(const game &old){
     // Copy Constructor
-    temp_count++;
     this->game_board = old.game_board;
-    this->castle.insert(old.castle.begin(), old.castle.end());
+    this->white_castle = old.white_castle;
+    this->black_castle = old.black_castle;
     this->en_passant = old.en_passant;
     this->game_over = old.game_over;
     this->checked = old.checked;
@@ -381,7 +379,7 @@ bool game::promote_pawn(int current, char piece, string player, bool ai=false){
             else
                 piece = tolower(piece);
             this->game_board[current] = piece;
-            this->target_areas[current] = get_valid_moves(this->game_board, current, player, this->castle);
+            this->target_areas[current] = get_valid_moves(this->game_board, current, player, this->white_castle, this->black_castle);
             if(!ai){
                 this->update_status(player);
                 this->checked = this->is_check(player);
@@ -468,13 +466,13 @@ bool game::make_move(int current, int target, string player, bool _reverse, bool
     this->set_occupied(reverse_player(player), target, 0);
     array <bitset<64>, 64> old_target_area;
     old_target_area = this->target_areas;
-    this->target_areas[target] = get_valid_moves(this->game_board, target, player, this->castle);
+    this->target_areas[target] = get_valid_moves(this->game_board, target, player, this->white_castle, this->black_castle);
     this->target_areas[current] = 0;
 
     for(int i = 0; i < 64; i++)
         if((this->target_areas[i] & move_board).any())
             //update target_area
-            this->target_areas[i] = get_valid_moves(this->game_board, i, get_player(this->game_board[i]), this->castle);
+            this->target_areas[i] = get_valid_moves(this->game_board, i, get_player(this->game_board[i]), this->white_castle, this->black_castle);
     bool checked_;
     if (!ai)
         checked_ = this->is_check(player);
@@ -500,10 +498,18 @@ bool game::make_move(int current, int target, string player, bool _reverse, bool
             left = 0;
             right = 7;
         }
-        if(current == left)
-            this->castle[player][0] = false;
-        else if(current == right)
-            this->castle[player][1] = false;
+        if(current == left){
+            if(player == WHITE)
+                this->white_castle[0] = false;
+            else
+                this->black_castle[0] = false;
+        }
+        else if(current == right){
+            if(player == WHITE)
+                this->white_castle[1] = false;
+            else
+                this->black_castle[1] = false;
+        }
     }
     else if(tolower(this->game_board[target]) == 'k'){
         char rook;
@@ -512,11 +518,11 @@ bool game::make_move(int current, int target, string player, bool _reverse, bool
         else
             rook = 'r';
         if(abs(target - current) == 2){
-            if(target == current - 2 && this->castle[player][0]){
+            if(target == current - 2){
                 // Queen Side
                 this->game_board[target + 1] = rook;
                 this->game_board[target - 2] = 'f';
-                this->target_areas[target + 1] = get_valid_moves(this->game_board, target + 1,  player, this->castle);
+                this->target_areas[target + 1] = get_valid_moves(this->game_board, target + 1,  player, {false, false}, {false, false});
                 this->set_occupied(player, target - 2, 0);
                 this->set_occupied(player, target + 1, 1);
                 this->target_areas[target - 2] = 0;
@@ -525,15 +531,16 @@ bool game::make_move(int current, int target, string player, bool _reverse, bool
                 // King Side
                 this->game_board[target - 1] = rook;
                 this->game_board[target + 1] = 'f';
-                this->target_areas[target - 1] = get_valid_moves(this->game_board, target - 1,  player, this->castle);
+                this->target_areas[target - 1] = get_valid_moves(this->game_board, target - 1,  player, {false, false}, {false, false});
                 this->set_occupied(player, target - 1, 1);
                 this->set_occupied(player, target + 1, 0);
                 this->target_areas[target + 1] = 0;
             }
         }
-        this->castle[player][0] = false;
-        this->castle[player][1] = false;
-
+        if(player == WHITE)
+            this->white_castle = {0, 0};
+        else
+            this->black_castle = {0, 0};
     }
     else if(tolower(this->game_board[target]) == 'p'){
         // Setting Up Pawn Promotion
@@ -589,6 +596,9 @@ game::~game()
 
 
 // AI functions
+
+
+
 void set_piece_vals(map<char,int> &piece_vals, string max_player){
     int multiplier = 1; // By default max_player is black
     if(max_player == WHITE)
@@ -609,7 +619,7 @@ void set_piece_vals(map<char,int> &piece_vals, string max_player){
     piece_vals['K'] = multiplier * -1 * pow(10, 7);
 }
 
-int heuristic(game GameObj, string player, string max_player, int& j, bool debug){
+int heuristic(game GameObj, string player, string max_player, bool debug){
     map<char, int> piece_vals;
     int score = 0;
     set_piece_vals(piece_vals, max_player);
@@ -617,14 +627,14 @@ int heuristic(game GameObj, string player, string max_player, int& j, bool debug
         score += piece_vals[GameObj.game_board[i]];
     if(score == 450 && debug)
         disp_board(GameObj.game_board);
-    j++;
+    nodes++;
     return score;
 }
 
-int minimax(game GameObj, string max_player, string player, bool is_max, short int depth, int alpha, int beta, int &i, bool debug){
+int minimax(game GameObj, string max_player, string player, bool is_max, short int depth, int alpha, int beta, bool debug){
     game tempObj;
     if(depth == 0)
-        return heuristic(GameObj, player, max_player, i, debug);
+        return heuristic(GameObj, player, max_player, debug);
 
     int val;
     Move *temp = GameObj.get_all_moves(player, false);
@@ -632,7 +642,7 @@ int minimax(game GameObj, string max_player, string player, bool is_max, short i
         for(;temp != nullptr; temp=temp->next){
             tempObj = game(GameObj);
             tempObj.make_move(temp->current, temp->target, player, false, true);
-            val = minimax(tempObj, max_player, reverse_player(player), false, depth - 1, alpha, beta, i, debug);
+            val = minimax(tempObj, max_player, reverse_player(player), false, depth - 1, alpha, beta, debug);
             alpha = max(alpha, val);
             if(beta <= alpha)
                 break;
@@ -646,7 +656,7 @@ int minimax(game GameObj, string max_player, string player, bool is_max, short i
         for(;temp != nullptr; temp=temp->next){
             tempObj = game(GameObj);
             tempObj.make_move(temp->current, temp->target, player, false, true);
-            val = minimax(tempObj, max_player, reverse_player(player), true, depth - 1, alpha, beta, i, debug);
+            val = minimax(tempObj, max_player, reverse_player(player), true, depth - 1, alpha, beta, debug);
             beta = min(val, beta);
             if(beta <= alpha)
                 break;
@@ -658,6 +668,21 @@ int minimax(game GameObj, string max_player, string player, bool is_max, short i
     }
 }
 
+struct board_player{
+    game GameObj;
+    string player;
+    Move current_move;
+};
+
+bool compare_board(board_player a, board_player b){
+    // ! is used for sorting in descending order
+    int h_a = heuristic(a.GameObj, a.player, a.player, false);
+    int h_b = heuristic(b.GameObj, b.player, b.player, false);
+    if (h_a == h_b)
+        return false;
+    return !(h_a < h_b);
+}
+
 Move call_ai(game GameObj, string player, short int depth){
     int beta = pow(10, 5);
     int alpha = -1 * pow(10, 5);
@@ -665,26 +690,31 @@ Move call_ai(game GameObj, string player, short int depth){
     int temp_val;
     Move move_pos(-1, -1);
     Move *temp = GameObj.get_all_moves(player, false);
-    int i=0;
-    bool debug;
+    bool debug = false;
     game tempObj;
-    for(;temp != nullptr; temp=temp->next){
-        tempObj = game(GameObj);
-        tempObj.make_move(temp->current, temp->target, player, false, true);
-        if(temp->current == 6 && temp->target == 23)
-            debug = true;
-        else
-            debug = false;
-        temp_val = minimax(tempObj, player, reverse_player(player), false, depth - 1, alpha, beta, i, debug);
+    board_player States[1000];
+    int n = 0;
+    for(;temp != nullptr; temp=temp->next, n++){
+        States[n].GameObj = game(GameObj);
+        States[n].GameObj.make_move(temp->current, temp->target, player, false, true);
+        States[n].current_move = *temp;
+        States[n].player = player;
+    }
+
+    sort(States, States + n, compare_board);
+
+    for(int i = 0;i < n; i++){
+        temp_val = minimax(States[i].GameObj, player, reverse_player(player), false, depth - 1, alpha, beta, debug);
         //cout<<endl<<temp->current<<' '<<temp->target<<' '<<temp_val<<' '<<alpha<<endl;
         if(temp_val > alpha){
-            move_pos.current = temp->current;
-            move_pos.target = temp->target;
+            move_pos.current = States[i].current_move.current;
+            move_pos.target = States[i].current_move.target;
             alpha = temp_val;
-            cout<<alpha;
+            cout<<alpha<<endl;
         }
     }
-    cout<<"Nodes "<<i<<' '<<temp;
+
+    cout<<"Nodes "<<nodes<<' '<<temp;
     cout<<endl<<alpha;
     return move_pos;
 }

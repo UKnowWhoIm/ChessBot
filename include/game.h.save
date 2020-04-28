@@ -64,6 +64,8 @@ class game
         int en_passant;
         bool game_over;
         bool checked;
+        array white_castle[2];
+        array black_castle[2];
         string winner;
         string game_board;
         int pawn_promotion;
