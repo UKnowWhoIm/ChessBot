@@ -37,6 +37,7 @@ void disp_board(bitset<64>);
 bitset<64> get_valid_moves(string, int, string);
 int* get_true_pos(bitset<64>);
 string reverse_player(string);
+void disp_board(string);
 
 class game
 {

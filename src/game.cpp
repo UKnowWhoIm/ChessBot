@@ -15,6 +15,7 @@ game::game(char board[64])
 
 }
 */
+int temp_count = 0;
 
 struct Updation{
     int updation;
@@ -26,6 +27,15 @@ void disp_board(bitset<64> board){
         if(i % 8 == 0)
             cout<<'\n';
         cout<<board[63-i];
+
+    }
+}
+
+void disp_board(string board){
+    for(int i=0;i<64;i++){
+        if(i % 8 == 0)
+            cout<<"\n\n";
+        cout<<board[i]<<' ';
 
     }
 }
@@ -246,16 +256,16 @@ game::game(){
 
 game::game(const game &old){
     // Copy Constructor
-
+    temp_count++;
     this->game_board = old.game_board;
-    this->castle.insert(old.castle.begin(), old.castle.end());
+    //this->castle.insert(old.castle.begin(), old.castle.end());
     this->en_passant = old.en_passant;
     this->game_over = old.game_over;
     this->checked = old.checked;
     this->winner = old.winner;
     this->black_occupied = old.black_occupied;
     this->white_occupied = old.white_occupied;
-    this->target_area.insert(old.target_area.begin(), old.target_area.end());
+    //this->target_area.insert(old.target_area.begin(), old.target_area.end());
     this->pawn_promotion = old.pawn_promotion;
 }
 
@@ -600,29 +610,31 @@ void set_piece_vals(map<char,int> &piece_vals, string max_player){
     piece_vals['K'] = multiplier * -1 * pow(10, 7);
 }
 
-signed int heuristic(game GameObj, string player, string max_player, int& i){
+int heuristic(game GameObj, string player, string max_player, int& j, bool debug){
     map<char, int> piece_vals;
     int score = 0;
     set_piece_vals(piece_vals, max_player);
     for(int i = 0; i < 64; i++)
         score += piece_vals[GameObj.game_board[i]];
-
-    i++;
+    if(score == 450 && debug)
+        disp_board(GameObj.game_board);
+    j++;
     return score;
 }
 
-int minimax(game GameObj, string max_player, string player, bool is_max, short int depth, int alpha, int beta, int &i){
-    if(depth == 0){
-        return heuristic(GameObj, player, max_player, i);
-    }
+int minimax(game GameObj, string max_player, string player, bool is_max, short int depth, int alpha, int beta, int &i, bool debug){
+    game tempObj;
+    if(depth == 0)
+        return heuristic(GameObj, player, max_player, i, debug);
 
     int val;
     Move *temp = GameObj.get_all_moves(player, false);
     if(is_max){
         for(;temp != nullptr; temp=temp->next){
-            GameObj.make_move(temp->current, temp->target, player, false, true);
-            val = minimax(GameObj, max_player,reverse_player(player), false, depth - 1, alpha, beta, i);
-            alpha = val > alpha ? val : alpha;
+            tempObj = game(GameObj);
+            tempObj.make_move(temp->current, temp->target, player, false, true);
+            val = minimax(tempObj, max_player, reverse_player(player), false, depth - 1, alpha, beta, i, debug);
+            alpha = max(alpha, val);
             if(beta <= alpha)
                 break;
         }
@@ -633,9 +645,10 @@ int minimax(game GameObj, string max_player, string player, bool is_max, short i
     }
     else{
         for(;temp != nullptr; temp=temp->next){
-            GameObj.make_move(temp->current, temp->target, player, false, true);
-            val = minimax(GameObj, max_player, reverse_player(player), true, depth - 1, alpha, beta, i);
-            beta = beta > val ? val : beta;
+            tempObj = game(GameObj);
+            tempObj.make_move(temp->current, temp->target, player, false, true);
+            val = minimax(tempObj, max_player, reverse_player(player), true, depth - 1, alpha, beta, i, debug);
+            beta = min(val, beta);
             if(beta <= alpha)
                 break;
         }
@@ -649,21 +662,31 @@ int minimax(game GameObj, string max_player, string player, bool is_max, short i
 Move call_ai(game GameObj, string player, short int depth){
     int beta = pow(10, 5);
     int alpha = -1 * pow(10, 5);
+
     int temp_val;
     Move move_pos(-1, -1);
     Move *temp = GameObj.get_all_moves(player, false);
     int i=0;
+    bool debug;
+    game tempObj;
     for(;temp != nullptr; temp=temp->next){
-        i++;
-        GameObj.make_move(temp->current, temp->target, player, false, true);
-        temp_val = minimax(GameObj, player, reverse_player(player), false, depth - 1, alpha, beta, i);
+        tempObj = game(GameObj);
+        tempObj.make_move(temp->current, temp->target, player, false, true);
+        if(temp->current == 6 && temp->target == 23)
+            debug = true;
+        else
+            debug = false;
+        temp_val = minimax(tempObj, player, reverse_player(player), false, depth - 1, alpha, beta, i, debug);
+        //cout<<endl<<temp->current<<' '<<temp->target<<' '<<temp_val<<' '<<alpha<<endl;
         if(temp_val > alpha){
             move_pos.current = temp->current;
             move_pos.target = temp->target;
             alpha = temp_val;
+            cout<<alpha;
         }
     }
-    cout<<"Nodes "<<i;
+    cout<<"Nodes "<<i<<' '<<temp;
+    cout<<endl<<alpha;
     return move_pos;
 }
 

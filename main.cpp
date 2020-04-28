@@ -4,14 +4,7 @@ using namespace std;
 using namespace std::chrono;
 
 
-void disp_board(string board){
-    for(int i=0;i<64;i++){
-        if(i % 8 == 0)
-            cout<<"\n\n";
-        cout<<board[i]<<' ';
 
-    }
-}
 
 int convert_to_pos(char notation[2]){
     // Receives chess notation(eg A2) and converts to 'pos'
@@ -43,6 +36,7 @@ int main()
     Move a;
     int target, current;
     bool status;
+    /*
     while(!GameObj.game_over){
         disp_board(GameObj.game_board);
         cout<<"\n"<<player<<"\'s Turn";
@@ -83,7 +77,24 @@ int main()
         else
             cout<<"\n\nERROR\n\n";
     }
-
-
+    */
+    game tempObj;
+    auto start = high_resolution_clock::now();
+    for(int j=0;j<58279;j++)
+        tempObj = game(GameObj);
+    auto stop = high_resolution_clock::now();
+    auto duration = duration_cast<milliseconds>(stop - start);
+    cout<<endl<<duration.count()<<endl;
+    array<bitset<64>,64> target_arr;
+    array<bitset<64>,64> dummy;
+    auto sstart = high_resolution_clock::now();
+    for(int j=0;j<58279;j++)
+        target_arr = dummy;
+    auto sstop = high_resolution_clock::now();
+    auto sduration = duration_cast<milliseconds>(sstop - sstart);
+    cout<<sduration.count();
+    dummy[1] = 8;
+    target_arr[1] = 64;
+    cout<<endl<<dummy[1]<<' '<<target_arr[1];
     return 0;
 }
