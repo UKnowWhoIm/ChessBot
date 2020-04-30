@@ -6,7 +6,7 @@ using namespace std::chrono;
 
 
 
-int convert_to_pos(char notation[2]){
+int convert_to_pos(char notation[3]){
     // Receives chess notation(eg A2) and converts to 'pos'
     int pos=0;
     pos += toupper(notation[0]) - 65;
@@ -32,10 +32,19 @@ int main()
     string player = WHITE;
     const string human = WHITE;
     const string ai_player = BLACK;
-    char notation_target[2], notation_current[2];
+    char notation_target[3], notation_current[3];
     Move a;
     int target, current;
     bool status;
+    GameObj.make_move(52, 36, WHITE, false, false);
+
+    GameObj.make_move(11, 27, BLACK, false, false);
+
+    GameObj.make_move(36, 27, WHITE, false, false);
+
+    GameObj.make_move(3, 27, BLACK, false, false);
+
+    //GameObj.make_move(57, 42, WHITE, false, false);
     while(!GameObj.game_over){
         disp_board(GameObj.game_board);
         cout<<"\n"<<player<<"\'s Turn";
@@ -50,7 +59,7 @@ int main()
         }
         else{
             auto start = high_resolution_clock::now();
-            a = call_ai(GameObj, player, 4);
+            a = call_ai(GameObj, player, 5);
             auto stop = high_resolution_clock::now();
             auto duration = duration_cast<milliseconds>(stop - start);
             cout<<'\n'<<a.current<<' '<<a.target<<' '<<duration.count()<<endl;
