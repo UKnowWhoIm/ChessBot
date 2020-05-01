@@ -14,15 +14,10 @@ using namespace std;
 const string WHITE = "white";
 const string BLACK = "black";
 
-struct Comparer {
-    bool operator() (const bitset<64> &b1, const bitset<64> &b2) const {
-        return b1.to_ulong() < b2.to_ulong();
-    }
-};
-
 struct Move{
     int current;
     int target;
+    int score;
     Move *next;
     Move(){
         this->next = nullptr;
@@ -30,6 +25,8 @@ struct Move{
     Move(int c, int t){
         this->current = c;
         this->target = t;
+    }
+    Move(short c, short t, int s){
     }
 };
 
@@ -55,11 +52,10 @@ class game
         bitset<64> get_pseudo_target_area(string);
         Move* get_all_moves(string, bool);
         int check_game_over(string);
-        int* get_player_posns(string);
         void set_occupied(string, int, bool);
-        bool make_move(int, int, string, bool, bool);
+        bool make_move(short int, short int, string, bool, bool);
         bool is_check(string);
-        int* get_checked_pieces(string);
+        bool is_capture(short, short);
         bool promote_pawn(int, char, string, bool);
         void update_status(string);
         int en_passant;

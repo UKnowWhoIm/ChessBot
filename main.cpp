@@ -36,18 +36,6 @@ int main()
     Move a;
     int target, current;
     bool status;
-    /*
-    Recreating segmentation fault
-
-    GameObj.make_move(52, 36, WHITE, false, false);
-
-    GameObj.make_move(11, 27, BLACK, false, false);
-
-    GameObj.make_move(36, 27, WHITE, false, false);
-
-    GameObj.make_move(3, 27, BLACK, false, false);
-    */
-
 
     while(!GameObj.game_over){
         disp_board(GameObj.game_board);
@@ -63,7 +51,7 @@ int main()
         }
         else{
             auto start = high_resolution_clock::now();
-            a = call_ai(GameObj, player, 3);
+            a = call_ai(GameObj, player, 4);
             auto stop = high_resolution_clock::now();
             auto duration = duration_cast<milliseconds>(stop - start);
             cout<<'\n'<<a.current<<' '<<a.target<<' '<<duration.count()<<endl;
@@ -71,7 +59,7 @@ int main()
         }
         if(status){
             cout<<endl;
-            //disp_board(GameObj.get_occupied(WHITE));
+            disp_board(GameObj.get_occupied(player));
             if(GameObj.pawn_promotion != -1){
                 if(player != human){
                     GameObj.promote_pawn(a.target, 'q', player, true);

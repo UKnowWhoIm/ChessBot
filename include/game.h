@@ -15,8 +15,8 @@ const string WHITE = "white";
 const string BLACK = "black";
 
 struct Move{
-    int current;
-    int target;
+    short current;
+    short target;
     int score;
     Move *next;
     Move(){
@@ -26,12 +26,17 @@ struct Move{
         this->current = c;
         this->target = t;
     }
+    Move(short c, short t, int s){
+        this->current = c;
+        this->target = t;
+        this->score = s;
+    }
 };
 
 void disp_board(bitset<64>);
 // For debugging purposes only, Delete in production
 bitset<64> get_valid_moves(string, int, string);
-int* get_true_pos(bitset<64>);
+vector<int> get_true_pos(bitset<64>);
 string reverse_player(string);
 void disp_board(string);
 
@@ -48,13 +53,12 @@ class game
         bitset<64> get_true_target_area(string);
         bitset<64> get_pseudo_target_area(int);
         bitset<64> get_pseudo_target_area(string);
-        Move* get_all_moves(string, bool);
+        vector<Move> get_all_moves(string, bool);
         int check_game_over(string);
-        int* get_player_posns(string);
         void set_occupied(string, int, bool);
-        bool make_move(int, int, string, bool, bool);
+        bool make_move(short, short, string, bool, bool);
         bool is_check(string);
-        int* get_checked_pieces(string);
+        bool is_capture(short, short);
         bool promote_pawn(int, char, string, bool);
         void update_status(string);
         int en_passant;
