@@ -40,6 +40,15 @@ void disp_board(string board){
     }
 }
 
+void set_bit(bitset<64> &bit_board, short pos, short val=1){
+    bit_board.set(63 - pos, val);
+}
+
+bool test_bit(bitset<64> bit_board, short pos){
+    return bit_board.test(63 - pos);
+}
+
+
 vector<int> get_true_pos(bitset<64> board){
     // Find the true values in a bitboard
     vector<int> posns;
@@ -76,14 +85,6 @@ int how_many_times_can_go_right(int pos){
     return 7 - pos % 8;
 }
 
-void set_bit(bitset<64> &bit_board, short pos, short val=1){
-    bit_board.set(63 - pos, val);
-}
-
-bool test_bit(bitset<64> bit_board, short pos){
-    return bit_board.test(63 - pos);
-}
-
 string reverse_player(string player){
     if(player == WHITE)
         return BLACK;
@@ -98,7 +99,7 @@ bitset<64> move_generator(string board, int pos, array<Updation, 4> updation, in
         for(k=0;pos_temp >= 0 && pos_temp <= 63; pos_temp += updation[i].updation, k++){
             if(updation[i].times == k)
                 break;
-            set_bit(area, pos_temp)
+            set_bit(area, pos_temp);
             if(board[pos_temp] != 'f')
                 // Current col is occupied
                 break;
@@ -147,9 +148,9 @@ bitset<64> get_valid_moves(string board, int pos, string player, array<bool, 2> 
             // Right Side Capture
             set_bit(area, pos + 8*dirn + 1);
         // ENPASSANT GOES HERE
-        if(can_go_left(pos) && board[pos - 1] == 'f' && get_player(board[pos - 1]) == reverse_player(player) && en_passant_pos)
+        if(can_go_left(pos) && tolower(board[pos - 1]) == 'p' && get_player(board[pos - 1]) == reverse_player(player) && en_passant_pos)
             set_bit(area, pos + 8*dirn - 1);
-        if(can_go_right(pos) && board[pos + 1] == 'f' && get_player(board[pos + 1]) == reverse_player(player) && en_passant_pos)
+        if(can_go_right(pos) && tolower(board[pos + 1]) == 'p' && get_player(board[pos + 1]) == reverse_player(player) && en_passant_pos)
             set_bit(area, pos + 8*dirn + 1);
 
     }
@@ -174,7 +175,7 @@ bitset<64> get_valid_moves(string board, int pos, string player, array<bool, 2> 
         }
         for(int i=0; i < k; i++)
             if( pos + posns[i] >= 0 && pos + posns[i] < 64)
-                set_bit(area, pos + posns[i])
+                set_bit(area, pos + posns[i]);
     }
     else if(tolower(board[pos]) == 'k'){
         array<int, 10> posns = {-8, 8, 0, 0, 0, 0, 0, 0, 0, 0};
@@ -199,7 +200,7 @@ bitset<64> get_valid_moves(string board, int pos, string player, array<bool, 2> 
                 posns[k++] = 2;
         for(int i=0; i < k; i++)
             if( pos + posns[i] >= 0 && pos + posns[i] < 64 )
-                set_bit(area, pos + posns[i])
+                set_bit(area, pos + posns[i]);
     }
     else{
         // Q, B, R
@@ -340,17 +341,17 @@ bitset<64> game::get_true_target_area(int pos, string player){
         if(this->game_board[pos + 8*dirn] == 'f' && this->game_board[pos + 16*dirn] == 'f' && initial_move)
             // Initial Double Step
             set_bit(area, pos + 16*dirn);
-        if(get_player(this->game_board[pos + 8*dirn - 1]) == reverse_player(player))
+        if(get_player(this->game_board[pos + 8*dirn - 1]) == reverse_player(player) && can_go_left(pos))
             // Left Capture
             set_bit(area, pos + 8*dirn - 1);
-        if(get_player(this->game_board[pos + 8*dirn + 1]) == reverse_player(player))
+        if(get_player(this->game_board[pos + 8*dirn + 1]) == reverse_player(player) && can_go_right(pos))
             // Right Capture
             set_bit(area, pos + 8*dirn + 1);
         // EN PASSANT
-        if(tolower(this->game_board[pos - 1]) == 'p' && get_player(this->game_board[pos - 1]) == reverse_player(player) && can_go_left(pos) && this->en_passant == pos - 1 + 8 * dirn)
-            area[63 - (pos - 1 + 8 * dirn)] = 1;
-        if(tolower(this->game_board[pos + 1]) == 'p' && get_player(this->game_board[pos + 1]) == reverse_player(player) && can_go_right(pos) && this->en_passant == pos + 1 + 8 * dirn)
-            area[63 - (pos + 1 + 8 * dirn)] = 1;
+        if(tolower(this->game_board[pos - 1]) == 'p' && get_player(this->game_board[pos - 1]) == reverse_player(player) && can_go_left(pos) && this->en_passant == pos - 1 + 8 * dirn && this->game_board[pos + 8 * dirn] == 'f')
+            set_bit(area, pos + 8*dirn - 1);
+        if(tolower(this->game_board[pos + 1]) == 'p' && get_player(this->game_board[pos + 1]) == reverse_player(player) && can_go_right(pos) && this->en_passant == pos + 1 + 8 * dirn&& this->game_board[pos + 8 * dirn] == 'f')
+            set_bit(area, pos + 8*dirn + 1);
         return area;
     }
     return this->target_areas[pos] & ~this->get_occupied(player);
@@ -407,7 +408,7 @@ bool game::promote_pawn(int current, char piece, string player, bool ai=false){
 
 void game::set_occupied(string player, int index, bool val){
     if(player == WHITE)
-        set_bit(this->white_occupied, index, val)
+        set_bit(this->white_occupied, index, val);
     else if(player == BLACK)
         set_bit(this->black_occupied, index, val);
 }
@@ -448,7 +449,7 @@ bool game::is_capture(short current, short target){
 }
 
 bool comparer(Move a, Move b){
-    return a.score < b.score;
+    return !(a.score < b.score;
 }
 
 vector<Move> game::get_all_moves(string player, bool legal){
@@ -763,8 +764,7 @@ int minimax(game GameObj, string max_player, string player, bool is_max, short i
 
 Move call_ai(game GameObj, string player, short int depth){
     int beta = pow(10, 5);
-    int alpha = -1 * pow(10, 5);
-
+    int alpha = -pow(10, 5);
     int temp_val;
     Move move_pos(-1, -1);
     vector<Move> moves = GameObj.get_all_moves(player, false);
@@ -777,10 +777,8 @@ Move call_ai(game GameObj, string player, short int depth){
             move_pos.current = temp->current;
             move_pos.target = temp->target;
             alpha = temp_val;
-            cout<<alpha<<endl;
         }
     }
-
     cout<<"Nodes "<<nodes<<' '<<alpha;
     return move_pos;
 }

@@ -449,7 +449,7 @@ bool game::is_capture(short current, short target){
 }
 
 bool comparer(Move a, Move b){
-    return a.score < b.score;
+    return !(a.score < b.score);
 }
 
 vector<Move> game::get_all_moves(string player, bool legal){
