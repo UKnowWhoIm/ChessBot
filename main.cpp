@@ -36,6 +36,7 @@ int main()
     Move a;
     int target, current;
     bool status;
+    //disp_board(GameObj.get_true_target_area(28, WHITE));
 
     while(!GameObj.game_over){
         disp_board(GameObj.game_board);
@@ -58,8 +59,8 @@ int main()
             status = GameObj.make_move(a.current, a.target, player, false, true);
         }
         if(status){
-            cout<<endl;
-            disp_board(GameObj.get_occupied(player));
+            //cout<<endl;
+            //disp_board(GameObj.get_occupied(player));
             if(GameObj.pawn_promotion != -1){
                 if(player != human){
                     GameObj.promote_pawn(a.target, 'q', player, true);
@@ -80,15 +81,6 @@ int main()
             cout<<"\n\nERROR\n\n";
     }
 /*
-    game tempObj;
-    auto start = high_resolution_clock::now();
-    for(int j=0;j<58279;j++)
-        tempObj = game(GameObj);
-    auto stop = high_resolution_clock::now();
-    auto duration = duration_cast<milliseconds>(stop - start);
-    cout<<endl<<duration.count()<<endl;
-    array<bitset<64>,64> target_arr;
-    array<bitset<64>,64> dummy;
-    */
+*/
     return 0;
 }

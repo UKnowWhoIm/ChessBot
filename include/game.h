@@ -33,13 +33,6 @@ struct Move{
     }
 };
 
-void disp_board(bitset<64>);
-// For debugging purposes only, Delete in production
-bitset<64> get_valid_moves(string, int, string);
-vector<int> get_true_pos(bitset<64>);
-string reverse_player(string);
-void disp_board(string);
-
 class game
 {
     public:
@@ -74,6 +67,16 @@ class game
         array <bitset<64>, 64> target_areas;
 
 };
+
+
+void disp_board(bitset<64>);
+// For debugging purposes only, Delete in production
+bitset<64> get_valid_moves(string, int, string);
+vector<int> get_true_pos(bitset<64>);
+int heuristic(game, string, string);
+string reverse_player(string);
+void disp_board(string);
+
 Move call_ai(game, string, short int);
 
 #endif // GAME_H
