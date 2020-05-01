@@ -474,7 +474,7 @@ void sort_lists(Move* start, Move* stop){
     // cout<<start->current<<' '<<stop->current;
 }
 
-Move* game::get_all_moves(string player, bool legal){
+Move* game::get_all_moves(string player, bool legal, bool debug){
 
     Move *non_captures = nullptr;
     Move *capture_start = nullptr;
@@ -514,11 +514,9 @@ Move* game::get_all_moves(string player, bool legal){
     if(capture_start != nullptr){
         sort_lists(capture_start, capture_end);
         capture_end->next = non_captures;
+        return capture_start;
     }
-    else
-        capture_start = non_captures;
-
-    return capture_start;
+    return non_captures;
 }
 
 bool game::make_move(int current, int target, string player, bool _reverse, bool ai){
@@ -567,7 +565,7 @@ bool game::make_move(int current, int target, string player, bool _reverse, bool
         this -> set_occupied(player, current, 1);
         this -> set_occupied(player, target, 0);
         if(old_piece != 'f')
-            this -> set_occupied(reverse_player(player), current, 1);
+            this -> set_occupied(reverse_player(player), target, 1);
         return !checked_;
     }
     char debug_a = this->game_board[target];
@@ -743,8 +741,9 @@ bool check_null_move(game GameObj, string player){
 const int draw_cutoff = 200;
 const short int R = 2;
 
-int minimax(game GameObj, string max_player, string player, bool is_max, short int depth, int alpha, int beta, bool null_move){
+int minimax(game Game\bj, string max_player, string player, bool is_max, short int depth, int alpha, int beta, bool null_move){
     game tempObj;
+
     if(depth == 0)
         return heuristic(GameObj, player, max_player);
     int val;
@@ -756,19 +755,18 @@ int minimax(game GameObj, string max_player, string player, bool is_max, short i
             return beta;
     }
 
-    Move *temp = GameObj.get_all_moves(player, false);
-
+    Move* moves = GameObj.get_all_moves(player, false);
 
     if(is_max){
-        for(;temp != nullptr; temp=temp->next){
+        for(;moves != nullptr; moves=moves->next){
             tempObj = game(GameObj);
-            tempObj.make_move(temp->current, temp->target, player, false, true);
+            tempObj.make_move(moves->current, moves->target, player, false, true);
             val = minimax(tempObj, max_player, reverse_player(player), false, depth - 1, alpha, beta, null_move);
             alpha = max(alpha, val);
             if(beta <= alpha)
                 break;
         }
-        if(alpha == -1*pow(10, 5)){
+        if(alpha == -1*pow(10, 4)){
             // No moves
             if(heuristic(GameObj, player, max_player) < -draw_cutoff && !GameObj.is_check(player))
                 // Not in check implies draw...
@@ -778,9 +776,9 @@ int minimax(game GameObj, string max_player, string player, bool is_max, short i
         return alpha;
     }
     else{
-        for(;temp != nullptr; temp=temp->next){
+        for(;moves != nullptr; moves=moves->next){
             tempObj = game(GameObj);
-            tempObj.make_move(temp->current, temp->target, player, false, true);
+            tempObj.make_move(moves->current, moves->target, player, false, true);
             val = minimax(tempObj, max_player, reverse_player(player), true, depth - 1, alpha, beta, null_move);
             beta = min(val, beta);
             if(beta <= alpha)

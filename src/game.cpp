@@ -474,7 +474,7 @@ void sort_lists(Move* start, Move* stop){
     // cout<<start->current<<' '<<stop->current;
 }
 
-Move* game::get_all_moves(string player, bool legal){
+Move* game::get_all_moves(string player, bool legal, bool debug){
 
     Move *non_captures = nullptr;
     Move *capture_start = nullptr;
@@ -514,11 +514,9 @@ Move* game::get_all_moves(string player, bool legal){
     if(capture_start != nullptr){
         sort_lists(capture_start, capture_end);
         capture_end->next = non_captures;
+        return capture_start;
     }
-    else
-        capture_start = non_captures;
-
-    return capture_start;
+    return non_captures;
 }
 
 bool game::make_move(int current, int target, string player, bool _reverse, bool ai){
@@ -757,13 +755,12 @@ int minimax(game GameObj, string max_player, string player, bool is_max, short i
             return beta;
     }
 
-    Move *temp = GameObj.get_all_moves(player, false);
-
+    Move* moves = GameObj.get_all_moves(player, false);
 
     if(is_max){
-        for(;temp != nullptr; temp=temp->next){
+        for(;moves != nullptr; moves=moves->next){
             tempObj = game(GameObj);
-            tempObj.make_move(temp->current, temp->target, player, false, true);
+            tempObj.make_move(moves->current, moves->target, player, false, true);
             val = minimax(tempObj, max_player, reverse_player(player), false, depth - 1, alpha, beta, null_move);
             alpha = max(alpha, val);
             if(beta <= alpha)
@@ -779,9 +776,9 @@ int minimax(game GameObj, string max_player, string player, bool is_max, short i
         return alpha;
     }
     else{
-        for(;temp != nullptr; temp=temp->next){
+        for(;moves != nullptr; moves=moves->next){
             tempObj = game(GameObj);
-            tempObj.make_move(temp->current, temp->target, player, false, true);
+            tempObj.make_move(moves->current, moves->target, player, false, true);
             val = minimax(tempObj, max_player, reverse_player(player), true, depth - 1, alpha, beta, null_move);
             beta = min(val, beta);
             if(beta <= alpha)
