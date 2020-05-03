@@ -2,19 +2,19 @@
 <CodeBlocks_layout_file>
 	<FileVersion major="1" minor="0" />
 	<ActiveTarget name="Debug" />
-	<File name="src\game.cpp" open="1" top="1" tabpos="3" split="0" active="1" splitpos="0" zoom_1="8" zoom_2="0">
+	<File name="src\game.cpp" open="1" top="1" tabpos="2" split="0" active="1" splitpos="0" zoom_1="6" zoom_2="0">
 		<Cursor>
-			<Cursor1 position="14849" topLine="446" />
+			<Cursor1 position="26227" topLine="735" />
 		</Cursor>
 	</File>
-	<File name="main.cpp" open="1" top="0" tabpos="2" split="0" active="1" splitpos="0" zoom_1="8" zoom_2="0">
+	<File name="include\game.h" open="1" top="0" tabpos="3" split="0" active="1" splitpos="0" zoom_1="7" zoom_2="0">
 		<Cursor>
-			<Cursor1 position="1860" topLine="54" />
+			<Cursor1 position="1368" topLine="15" />
 		</Cursor>
 	</File>
-	<File name="include\game.h" open="1" top="0" tabpos="1" split="0" active="1" splitpos="0" zoom_1="7" zoom_2="0">
+	<File name="main.cpp" open="1" top="0" tabpos="1" split="0" active="1" splitpos="0" zoom_1="8" zoom_2="0">
 		<Cursor>
-			<Cursor1 position="1448" topLine="45" />
+			<Cursor1 position="1704" topLine="43" />
 		</Cursor>
 	</File>
 </CodeBlocks_layout_file>

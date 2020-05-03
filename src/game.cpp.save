@@ -236,7 +236,7 @@ bitset<64> get_valid_moves(string board, int pos, string player, array<bool, 2> 
 }
 
 void set_piece_vals(map<char,int> &piece_vals, string max_player){
-    int multiplier = 1; // By default max_player is black
+    short multiplier = 1; // By default max_player is black
     if(max_player == WHITE)
         multiplier = -1;
     // BLACK
@@ -252,7 +252,7 @@ void set_piece_vals(map<char,int> &piece_vals, string max_player){
     piece_vals['B'] = multiplier * -300;
     piece_vals['R'] = multiplier * -500;
     piece_vals['Q'] = multiplier * -1000;
-    piece_vals['K'] = multiplier * -1 * pow(10, 7);
+    piece_vals['K'] = multiplier * -pow(10, 7);
 }
 
 game::game(){
@@ -263,6 +263,7 @@ game::game(){
     this->en_passant = -1;
     this->checked = false;
     this->pawn_promotion = -1;
+    this->moves_since_last_capture = 0;
     this->game_over = false;
     this->winner = "";
     for(int i=0; i < 64; i++){
@@ -432,16 +433,22 @@ int game::check_game_over(string player){
             return 1;
         return -1;
     }
+    if(this->moves_since_last_capture >= 50)
+        return -1;
     // 'player' has a legal move, implying not a draw or checkmate
     return 0;
 }
 
-bool game::is_capture(short current, short target){
+bool game::is_capture(short current, short target, string player){
 
     if(this->game_board[target] != 'f')
         // Normal capture
         return true;
-    if((this->en_passant == target - 1 || this->en_passant == target + 1 ) && tolower(this->game_board[current]) == 'p')
+    char enemy_pawn = 'p';
+    if(player == BLACK)
+        enemy_pawn = 'P';
+
+    if(this->en_passant == target && this->game_board[current] == enemy_pawn)
         // En Passant
         return true;
     return false;
@@ -452,7 +459,7 @@ bool comparer(Move a, Move b){
     return !(a.score < b.score);
 }
 
-vector<Move> game::get_all_moves(string player, bool legal){
+vector<Move> game::get_all_moves(string player, bool legal, bool capture_only){
     vector<Move> non_captures;
     vector<Move> captures;
     vector<int> temp;
@@ -466,9 +473,10 @@ vector<Move> game::get_all_moves(string player, bool legal){
                 if(legal)
                     if(!this->make_move(i, *j, player, true, false))
                         continue;
-                if(this->is_capture(i, *j))
-                    captures.push_back(Move(i, *j, piece_vals[i] - piece_vals[*j]));
-                else
+                if(this->is_capture(i, *j, player)){
+                    captures.push_back(Move(i, *j, piece_vals[this->game_board[i]] - piece_vals[this->game_board[*j]]));
+                }
+                else if(!capture_only)
                     non_captures.push_back(Move(i, *j, 0));
             }
         }
@@ -478,7 +486,8 @@ vector<Move> game::get_all_moves(string player, bool legal){
     sort(captures.begin(), captures.end(), comparer);
     all_moves.reserve(captures.size() + non_captures.size());
     all_moves.insert(all_moves.end(), captures.begin(), captures.end());
-    all_moves.insert(all_moves.end(), non_captures.begin(), non_captures.end());
+    if(!capture_only)
+        all_moves.insert(all_moves.end(), non_captures.begin(), non_captures.end());
     return all_moves;
 }
 
@@ -554,6 +563,10 @@ bool game::make_move(short current, short target, string player, bool _reverse, 
 
         return !checked_;
     }
+    if(old_piece != 'f')
+        this->moves_since_last_capture += 1;
+    else
+        this->moves_since_last_capture = 0;
     if(tolower(this->game_board[target]) == 'r'){
         int left, right;
         if(player == WHITE){
@@ -662,14 +675,12 @@ int nodes = 0;
 int heuristic(game GameObj, string player, string max_player){
     map<char, int> piece_vals;
     int score = 0, player_score = 0, enemy_score = 0;
-    short multiplier = 1;
+    short multiplier;
     map<string, bitset<64>> psuedo_target_areas;
     psuedo_target_areas[WHITE] = GameObj.get_pseudo_target_area(WHITE);
     psuedo_target_areas[BLACK] = GameObj.get_pseudo_target_area(BLACK);
     bool initial_rank;
-
     set_piece_vals(piece_vals, max_player);
-
     const short const_protection = 5;
 
     for(int i = 0; i < 64; i++){
@@ -679,12 +690,13 @@ int heuristic(game GameObj, string player, string max_player){
             else
                 multiplier = 1;
 
-            initial_rank = (i > 7 && i < 16 && get_player() == BLACK) || (i > 48 && i < 56 && player == WHITE);
+            initial_rank = (i > 7 && i < 16 && get_player(GameObj.game_board[i]) == BLACK) || (i > 47 && i < 56 && get_player(GameObj.game_board[i]) == WHITE);
             score += piece_vals[GameObj.game_board[i]];
             if(get_player(GameObj.game_board[i]) == player)
                 player_score += abs(piece_vals[GameObj.game_board[i]]);
             else
                 enemy_score += abs(piece_vals[GameObj.game_board[i]]);
+
             if(test_bit(psuedo_target_areas.at(get_player(GameObj.game_board[i])), i) && tolower(GameObj.game_board[i]) == 'p'){
                 if(!initial_rank)
                     ///* Pawns at initial rank are protected, so to move them forward, protection score wont be applied at initial rank
@@ -692,6 +704,7 @@ int heuristic(game GameObj, string player, string max_player){
             }
             else if(test_bit(psuedo_target_areas.at(get_player(GameObj.game_board[i])), i) && tolower(GameObj.game_board[i]) != 'p' )
                 score += const_protection * multiplier;
+
         }
     }
     nodes++;
@@ -719,21 +732,54 @@ bool check_null_move(game GameObj, string player){
 
 
 const int draw_cutoff = 200;
-const short int R = 2;
+const short R = 2;
 
-int minimax(game GameObj, string max_player, string player, bool is_max, short int depth, int alpha, int beta, bool null_move){
+int quiescence_search(game GameObj, string player, int alpha, int beta){
+
+    int stand_pat = heuristic(GameObj, max_player, max_player);
+    int delta = 1000; // Queen Value
     game tempObj;
+
+    if(stand_pat >= beta)
+        return beta;
+
+    // Delta pruning
+    if(stand_pat < alpha - delta && stand_pat >  late_game_cutoff)
+        // Cannot improve alpha
+        return alpha;
+    
+    alpha = max(stand_pat, alpha);
+    
+    vector<Move> captures = GameObj.get_all_moves(player, false, true);
+
+    for(auto i = moves.begin();i != moves.end(); i++){
+        tempObj = game(GameObj);
+        tempObj.make_move(i->current, i->target, player, false, true);
+        val = -quiescence_search(tempObj, reverse_player(player), -beta, -alpha);
+        if(val >= beta)
+            return beta;
+        alpha = max(val, alpha);
+    }
+    return alpha;
+
+}
+
+int minimax(game GameObj, string max_player, string player, bool is_max, short depth, int alpha, int beta, bool null_move){
 
     if(depth == 0)
         return heuristic(GameObj, player, max_player);
+        //return quiescence_search(GameObj, max_player, player, alpha, beta);
     int val;
 
     // Null Move
+    /*
     if(!null_move && depth >= R + 1 && check_null_move(GameObj, player)){
         val = -minimax(GameObj, max_player, reverse_player(player), !is_max, depth - R - 1, -beta, -beta + 1, true);
         if(val >= beta)
             return beta;
     }
+    */
+    game tempObj;
 
     vector<Move> moves = GameObj.get_all_moves(player, false);
 
@@ -745,8 +791,9 @@ int minimax(game GameObj, string max_player, string player, bool is_max, short i
             alpha = max(alpha, val);
             if(beta <= alpha)
                 break;
+
         }
-        if(alpha == -1*pow(10, 5)){
+        if(alpha == -pow(10, 5)){
             // No moves
             if(heuristic(GameObj, player, max_player) < -draw_cutoff && !GameObj.is_check(player))
                 // Not in check implies draw...
@@ -760,7 +807,7 @@ int minimax(game GameObj, string max_player, string player, bool is_max, short i
             tempObj = game(GameObj);
             tempObj.make_move(i->current, i->target, player, false, true);
             val = minimax(tempObj, max_player, reverse_player(player), true, depth - 1, alpha, beta, null_move);
-            beta = min(val, beta);
+            beta = min(beta, val);
             if(beta <= alpha)
                 break;
         }
@@ -774,24 +821,66 @@ int minimax(game GameObj, string max_player, string player, bool is_max, short i
     }
 }
 
-Move call_ai(game GameObj, string player, short int depth){
+short num_player(string player){
+    if(player == WHITE)
+        return 1;
+    return -1;
+}
+
+int negamax(game GameObj, string player, short depth, int alpha, int beta, bool null_move){
+    if(depth == 0)
+        //return heuristic(GameObj, player, player);
+        return 
+
+    // Null move pruning
+    if(!null_move && check_null_move(GameObj, player) && depth > R){
+        int val = -negamax(GameObj, reverse_player(player), depth - R - 1, -beta, -beta + 20, true);
+        if(val >= beta)
+            return beta;
+    }
+
+    game tempObj;
+
+    int val = -pow(10, 5);
+
+    vector<Move> moves = GameObj.get_all_moves(player, false);
+
+    for(auto i = moves.begin();i != moves.end(); i++){
+        tempObj = game(GameObj);
+        tempObj.make_move(i->current, i->target, player, false, true);
+        val = max(val, -negamax(tempObj, reverse_player(player), depth - 1, -beta, -alpha, null_move));
+        alpha = max(val, alpha);
+        if(alpha >= beta)
+            return alpha;
+    }
+
+    return val;
+}
+
+Move call_ai(game GameObj, string player, short depth){
     int beta = pow(10, 5);
     int alpha = -pow(10, 5);
     int temp_val;
+    int best_val = alpha;
     Move move_pos(-1, -1);
     vector<Move> moves = GameObj.get_all_moves(player, false);
     game tempObj;
     for(auto temp = moves.begin();temp != moves.end(); temp++){
+
         tempObj = game(GameObj);
         tempObj.make_move(temp->current, temp->target, player, false, true);
-        temp_val = minimax(tempObj, player, reverse_player(player), false, depth - 1, alpha, beta, false);
-        if(temp_val > alpha){
-            move_pos.current = temp->current;
-            move_pos.target = temp->target;
-            alpha = temp_val;
+        //temp_val = minimax(tempObj, player, reverse_player(player), false, depth - 1, alpha, beta, false);
+        temp_val = -negamax(tempObj, reverse_player(player), depth - 1, alpha, beta, false);
+        //cout<<temp->score<<" Score "<<temp_val<<endl;
+        if(temp_val > best_val){
+            move_pos = Move(temp->current, temp->target);
+            best_val = temp_val;
         }
+
+        alpha = max(best_val, alpha);
+
     }
-    cout<<"Nodes "<<nodes<<' '<<alpha;
+    cout<<"Nodes "<<nodes<<' '<<best_val;
     return move_pos;
 }
 

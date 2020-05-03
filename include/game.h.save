@@ -15,8 +15,8 @@ const string WHITE = "white";
 const string BLACK = "black";
 
 struct Move{
-    int current;
-    int target;
+    short current;
+    short target;
     int score;
     Move *next;
     Move(){
@@ -27,15 +27,11 @@ struct Move{
         this->target = t;
     }
     Move(short c, short t, int s){
+        this->current = c;
+        this->target = t;
+        this->score = s;
     }
 };
-
-void disp_board(bitset<64>);
-// For debugging purposes only, Delete in production
-bitset<64> get_valid_moves(string, int, string);
-int* get_true_pos(bitset<64>);
-string reverse_player(string);
-void disp_board(string);
 
 class game
 {
@@ -50,10 +46,11 @@ class game
         bitset<64> get_true_target_area(string);
         bitset<64> get_pseudo_target_area(int);
         bitset<64> get_pseudo_target_area(string);
-        Move* get_all_moves(string, bool);
+        vector<Move> get_all_moves(string, bool);
         int check_game_over(string);
+        short moves_since_last_ca
         void set_occupied(string, int, bool);
-        bool make_move(short int, short int, string, bool, bool);
+        bool make_move(short, short, string, bool, bool);
         bool is_check(string);
         bool is_capture(short, short);
         bool promote_pawn(int, char, string, bool);
@@ -71,6 +68,17 @@ class game
         array <bitset<64>, 64> target_areas;
 
 };
-Move call_ai(game, string, short int);
+
+
+void disp_board(bitset<64>);
+Move call_ai(game, string, short);
+
+// For debugging purposes only, Delete in production
+bitset<64> get_valid_moves(string, int, string);
+vector<int> get_true_pos(bitset<64>);
+int heuristic(game, string, string);
+string reverse_player(string);
+void disp_board(string);
+
 
 #endif // GAME_H

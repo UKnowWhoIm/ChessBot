@@ -46,12 +46,13 @@ class game
         bitset<64> get_true_target_area(string);
         bitset<64> get_pseudo_target_area(int);
         bitset<64> get_pseudo_target_area(string);
-        vector<Move> get_all_moves(string, bool);
+        vector<Move> get_all_moves(string, bool, bool=false);
         int check_game_over(string);
+        short moves_since_last_capture;
         void set_occupied(string, int, bool);
         bool make_move(short, short, string, bool, bool);
         bool is_check(string);
-        bool is_capture(short, short);
+        bool is_capture(short, short, string);
         bool promote_pawn(int, char, string, bool);
         void update_status(string);
         int en_passant;
@@ -70,6 +71,8 @@ class game
 
 
 void disp_board(bitset<64>);
+Move call_ai(game, string, short);
+
 // For debugging purposes only, Delete in production
 bitset<64> get_valid_moves(string, int, string);
 vector<int> get_true_pos(bitset<64>);
@@ -77,6 +80,5 @@ int heuristic(game, string, string);
 string reverse_player(string);
 void disp_board(string);
 
-Move call_ai(game, string, short int);
 
 #endif // GAME_H
