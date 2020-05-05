@@ -17,6 +17,43 @@ game::game(char board[64])
 */
 
 
+/**
+Random Num Array
+
+1 number to indicate the side to move is black
+1 number for each piece at each square, since pawns don't occupy the last rank(10 * 64 + 2 * 56)
+8 numbers to indicate the castling rights(4 values, each can be 1 or 0, therefore 2*4)
+8 numbers to indicate the file of a valid En passant square, if any
+*/
+
+array<unsigned long long , 1 + 10*64+2*56 + 8 + 8> PRN;
+
+
+/// Define static members
+map<char, short> game::TT_INDEXES = init_map();
+
+short game::tt_castle_start_index = game::TT_INDEXES['k'] + 64;
+
+short game::tt_en_passant_start = game::tt_castle_start_index + 8;
+
+/**
+TT CASTLE REF:
+
+    PRN Has 8 values for storing castling rights
+    "tt_castle_start_index" has been set to the 0th index of PRN's castling rights
+    Index 0: White QueenSide Castle True
+    Index 1: White QueenSide Castle False
+    Index 2: White KingSide Castle True
+    Index 3: White KingSide Castle False
+    Index 4: Black QueenSide Castle True
+    Index 5: Black QueenSide Castle False
+    Index 6: Black KingSide Castle True
+    Index 7: Black KingSide Castle False
+
+    ie tt_castle_start_index + i -> Index i
+
+*/
+
 struct Updation{
     int updation;
     int times;
@@ -293,6 +330,7 @@ game::game(const game &old){
     this->white_occupied = old.white_occupied;
     this->target_areas = old.target_areas;
     this->pawn_promotion = old.pawn_promotion;
+    this->zobrist_val = old.zobrist_val;
 }
 
 bitset<64> game::get_occupied(string player){
@@ -349,9 +387,9 @@ bitset<64> game::get_true_target_area(int pos, string player){
             // Right Capture
             set_bit(area, pos + 8*dirn + 1);
         // EN PASSANT
-        if(tolower(this->game_board[pos - 1]) == 'p' && get_player(this->game_board[pos - 1]) == reverse_player(player) && can_go_left(pos) && this->en_passant == pos - 1 + 8 * dirn && this->game_board[pos + 8 * dirn] == 'f')
+        if(tolower(this->game_board[pos - 1]) == 'p' && get_player(this->game_board[pos - 1]) == reverse_player(player) && can_go_left(pos) && this->en_passant == pos - 1 + 8 * dirn && this->game_board[pos - 1 + 8 * dirn] == 'f')
             set_bit(area, pos + 8*dirn - 1);
-        if(tolower(this->game_board[pos + 1]) == 'p' && get_player(this->game_board[pos + 1]) == reverse_player(player) && can_go_right(pos) && this->en_passant == pos + 1 + 8 * dirn&& this->game_board[pos + 8 * dirn] == 'f')
+        if(tolower(this->game_board[pos + 1]) == 'p' && get_player(this->game_board[pos + 1]) == reverse_player(player) && can_go_right(pos) && this->en_passant == pos + 1 + 8 * dirn && this->game_board[pos + 1 + 8 * dirn] == 'f')
             set_bit(area, pos + 8*dirn + 1);
         return area;
     }
@@ -526,6 +564,7 @@ bool game::make_move(short current, short target, string player, bool _reverse, 
         if((this->target_areas[i] & move_board).any())
             //update target_area
             this->target_areas[i] = get_valid_moves(this->game_board, i, get_player(this->game_board[i]), this->white_castle, this->black_castle);
+
     // Implementing En Passant
     if(this->en_passant == target && tolower(this->game_board[target]) == 'p' && old_piece == 'f'){
         is_en_passant = true;
@@ -538,8 +577,7 @@ bool game::make_move(short current, short target, string player, bool _reverse, 
         this->game_board[enemy_pos] = 'f';
         this->set_occupied(reverse_player(player), enemy_pos, 0);
         this->target_areas[enemy_pos] = 0;
-
-        }
+    }
     bool checked_;
     if (!ai)
         checked_ = this->is_check(player);
@@ -567,6 +605,17 @@ bool game::make_move(short current, short target, string player, bool _reverse, 
         this->moves_since_last_capture += 1;
     else
         this->moves_since_last_capture = 0;
+
+    if(is_en_passant){
+        // Remove en_passant piece from zobrist value
+        this->zobrist_val ^= PRN[this->TT_INDEXES[en_passant_piece] + en_passant_pos];
+        cout<<this->TT_INDEXES[en_passant_piece] + en_passant_pos<<" Removal of en Passant Piece\n";
+    }
+    if(this->en_passant != -1){
+        // Remove en passant file from zobrist value if it was set
+        this->zobrist_val ^= PRN[this->tt_en_passant_start + this->en_passant % 8];
+        cout<<this->tt_en_passant_start + this->en_passant % 8<<" Removal of previous en Passant\n";
+    }
     if(tolower(this->game_board[target]) == 'r'){
         int left, right;
         if(player == WHITE){
@@ -577,17 +626,30 @@ bool game::make_move(short current, short target, string player, bool _reverse, 
             left = 0;
             right = 7;
         }
+        // For TT Castle Ref see line 40
         if(current == left){
-            if(player == WHITE)
+            if(player == WHITE && this->white_castle[0]){
                 this->white_castle[0] = false;
-            else
+                this->zobrist_val ^= PRN[this->tt_castle_start_index + 0 + 0];
+                cout<<"White Castle[0] @ "<<this->tt_castle_start_index + 0 + 0<<endl;
+            }
+            else if(player == BLACK && this->black_castle[0]){
                 this->black_castle[0] = false;
+                this->zobrist_val ^= PRN[this->tt_castle_start_index + 4 + 0];
+                cout<<"Black Castle[0] @ "<<this->tt_castle_start_index + 4 + 0<<endl;
+            }
         }
         else if(current == right){
-            if(player == WHITE)
+            if(player == WHITE && this->white_castle[1]){
                 this->white_castle[1] = false;
-            else
+                this->zobrist_val ^= PRN[this->tt_castle_start_index + 2 + 0];
+                cout<<"White Castle[1] @ "<<this->tt_castle_start_index + 2 + 0<<endl;
+            }
+            else if(player == BLACK && this->black_castle[1]){
                 this->black_castle[1] = false;
+                this->zobrist_val ^= PRN[this->tt_castle_start_index + 6 + 0];
+                cout<<"Black Castle[1] @ "<<this->tt_castle_start_index + 6 + 0<<endl;
+            }
         }
     }
     else if(tolower(this->game_board[target]) == 'k'){
@@ -605,6 +667,11 @@ bool game::make_move(short current, short target, string player, bool _reverse, 
                 this->set_occupied(player, target - 2, 0);
                 this->set_occupied(player, target + 1, 1);
                 this->target_areas[target - 2] = 0;
+                // Remove Rook from initial
+                this->zobrist_val ^= PRN[TT_INDEXES[rook] + target - 2];
+                // Fix rook at target
+                this->zobrist_val ^= PRN[TT_INDEXES[rook] + target + 1];
+
             }
             else{
                 // King Side
@@ -614,12 +681,35 @@ bool game::make_move(short current, short target, string player, bool _reverse, 
                 this->set_occupied(player, target - 1, 1);
                 this->set_occupied(player, target + 1, 0);
                 this->target_areas[target + 1] = 0;
+                // Remove Rook from initial
+                this->zobrist_val ^= PRN[TT_INDEXES[rook] + target + 1];
+                // Fix rook at target
+                this->zobrist_val ^= PRN[TT_INDEXES[rook] + target - 1];
             }
         }
-        if(player == WHITE)
-            this->white_castle = {0, 0};
-        else
-            this->black_castle = {0, 0};
+        // For TT Castle Ref see line 40
+        if(player == WHITE){
+            if(this->white_castle[0]){
+                this->zobrist_val ^= PRN[this->tt_castle_start_index + 0 + 0];
+                //cout<<"White Castle[0] @ "<<this->tt_castle_start_index + 0 + 0<<endl;
+            }
+            if(this->white_castle[1]){
+                this->zobrist_val ^= PRN[this->tt_castle_start_index + 2 + 0];
+                //cout<<"White Castle[1] @ "<<this->tt_castle_start_index + 2 + 0<<endl;
+            }
+            this->white_castle = {false, false};
+        }
+        else if(player == BLACK){
+            if(this->black_castle[0]){
+                this->zobrist_val ^= PRN[this->tt_castle_start_index + 4 + 0];
+                //cout<<"Black Castle[0] @ "<<this->tt_castle_start_index + 4 + 0<<endl;
+            }
+            if(this->black_castle[1]){
+                this->zobrist_val ^= PRN[this->tt_castle_start_index + 6 + 0];
+                //cout<<"Black Castle[1] @ "<<this->tt_castle_start_index + 6 + 0<<endl;
+            }
+            this->black_castle = {false, false};
+        }
     }
     else if(tolower(this->game_board[target]) == 'p'){
         // Setting Up Pawn Promotion
@@ -647,8 +737,12 @@ bool game::make_move(short current, short target, string player, bool _reverse, 
             initial_move = current < 16 && current > 7 && target > 23 && target < 32;
         else
             initial_move = current < 56 && current > 47 && target < 40 && target > 31;
-        if(initial_move)
+        if(initial_move){
             this->en_passant = target - dirn*8;
+            this->zobrist_val ^= PRN[this->tt_en_passant_start + this->en_passant % 8];
+            //cout<<this->tt_en_passant_start + this->en_passant % 8<<" HASHED EN PASSANT\n";
+            //cout<<PRN[this->tt_en_passant_start + this->en_passant % 8]<<endl;
+        }
         else
             this->en_passant = -1;
     }
@@ -659,6 +753,12 @@ bool game::make_move(short current, short target, string player, bool _reverse, 
         update_status(player);
         this->checked = this->is_check(reverse_player(player));
     }
+
+    // Update position in zobrist(placed here to avoid cases of pawn promotion)
+    this->update_zobrist_val(current, target, this->game_board[target], old_piece);
+
+    // Switch Player in zobrist
+    this->zobrist_val ^= PRN[0];
     return true;
 }
 
@@ -669,6 +769,74 @@ game::~game()
 
 
 // AI functions
+class HashEntry{
+    // TODO
+    short depth;
+    unsigned long long zobrist;
+    public:
+    HashEntry(short _depth, unsigned long long _zobrist){
+        this->depth = _depth;
+        this->zobrist = _zobrist;
+    }
+};
+
+void initialize_prn(bool debug){
+    /// Run once in begining to initialize PRN
+
+    random_device rd;
+
+    mt19937_64 e2(rd());
+
+    uniform_int_distribution<unsigned long long> dist(pow(2, 63), pow(2, 64)-1);
+
+    ofstream file("debug.txt");
+    if(debug)
+        if(!file.is_open())
+            cout<<"File is Fucked";
+    for(short i=0; i < PRN.size(); i++){
+        PRN[i] = dist(e2);
+        if(debug)
+            file << PRN[i] <<endl;
+    }
+}
+
+void game::initial_zobrist_hash(string player){
+    /// Initially calculate zobrist value(ONLY CALL ONCE AT BEGINING)
+
+    this->zobrist_val = 0;
+
+    // PRN[0] for player == Black
+
+    if(player == BLACK)
+        this->zobrist_val ^= PRN[0];
+
+    // Next 10*64 + 2*56 indexes for position of pieces
+
+    for(int i = 0; i < 64; i++)
+        if(this->game_board[i] != 'f')
+            this->zobrist_val^= PRN[this->TT_INDEXES.at(this->game_board[i]) + i];
+
+    // Next 8 indexes for Castling
+
+    this->zobrist_val ^= PRN[this->tt_castle_start_index + (short)white_castle[0]];
+    this->zobrist_val ^= PRN[this->tt_castle_start_index + 2 +(short)white_castle[1]];
+    this->zobrist_val ^= PRN[this->tt_castle_start_index + 4 +(short)black_castle[0]];
+    this->zobrist_val ^= PRN[this->tt_castle_start_index + 6 +(short)black_castle[1]];
+
+    // Next 8 indexes for enpassant file if any
+
+    if(this->en_passant != -1){
+        this->zobrist_val ^= PRN[this->tt_en_passant_start + this->en_passant % 8];
+    }
+}
+
+void game::update_zobrist_val(short current, short target, char new_piece, char old_piece){
+    this->zobrist_val ^= PRN[this->TT_INDEXES[new_piece] + current];
+    this->zobrist_val ^= PRN[this->TT_INDEXES[new_piece] + target];
+    //cout<<this->TT_INDEXES[new_piece] + current<<" Current "<<this->TT_INDEXES[new_piece] + target<<endl;
+    if(old_piece != 'f')
+        this->zobrist_val ^= PRN[this->TT_INDEXES[old_piece] + current];
+}
 
 int nodes = 0;
 
@@ -699,7 +867,7 @@ int heuristic(game GameObj, string player, string max_player){
 
             if(test_bit(psuedo_target_areas.at(get_player(GameObj.game_board[i])), i) && tolower(GameObj.game_board[i]) == 'p'){
                 if(!initial_rank)
-                    ///* Pawns at initial rank are protected, so to move them forward, protection score wont be applied at initial rank
+                    /// Pawns at initial rank are protected, so to move them forward, protection score wont be applied at initial rank
                     score += const_protection * multiplier;
             }
             else if(test_bit(psuedo_target_areas.at(get_player(GameObj.game_board[i])), i) && tolower(GameObj.game_board[i]) != 'p' )
@@ -736,7 +904,8 @@ const short R = 2;
 
 int quiescence_search(game GameObj, string player, int alpha, int beta){
 
-    int stand_pat = heuristic(GameObj, max_player, max_player);
+    int stand_pat = heuristic(GameObj, player, player);
+    int val;
     int delta = 1000; // Queen Value
     game tempObj;
 
@@ -747,12 +916,12 @@ int quiescence_search(game GameObj, string player, int alpha, int beta){
     if(stand_pat < alpha - delta && stand_pat >  late_game_cutoff)
         // Cannot improve alpha
         return alpha;
-    
+
     alpha = max(stand_pat, alpha);
-    
+
     vector<Move> captures = GameObj.get_all_moves(player, false, true);
 
-    for(auto i = moves.begin();i != moves.end(); i++){
+    for(auto i = captures.begin();i != captures.end(); i++){
         tempObj = game(GameObj);
         tempObj.make_move(i->current, i->target, player, false, true);
         val = -quiescence_search(tempObj, reverse_player(player), -beta, -alpha);
@@ -771,14 +940,7 @@ int minimax(game GameObj, string max_player, string player, bool is_max, short d
         //return quiescence_search(GameObj, max_player, player, alpha, beta);
     int val;
 
-    // Null Move
-    /*
-    if(!null_move && depth >= R + 1 && check_null_move(GameObj, player)){
-        val = -minimax(GameObj, max_player, reverse_player(player), !is_max, depth - R - 1, -beta, -beta + 1, true);
-        if(val >= beta)
-            return beta;
-    }
-    */
+    // Null Mo
     game tempObj;
 
     vector<Move> moves = GameObj.get_all_moves(player, false);
@@ -830,7 +992,7 @@ short num_player(string player){
 int negamax(game GameObj, string player, short depth, int alpha, int beta, bool null_move){
     if(depth == 0)
         //return heuristic(GameObj, player, player);
-        return 
+        return quiescence_search(GameObj, player, alpha, beta);
 
     // Null move pruning
     if(!null_move && check_null_move(GameObj, player) && depth > R){

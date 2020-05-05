@@ -28,6 +28,8 @@ void get_status(game GameObj, string player){
 
 int main()
 {
+    /// Initialize PRN
+    initialize_prn(true);
     game GameObj;
     string player = WHITE;
     const string human = WHITE;
@@ -36,12 +38,14 @@ int main()
     Move a;
     int target, current;
     bool status;
+    bool multiplayer = true;
     //disp_board(GameObj.get_true_target_area(28, WHITE));
-
-    while(!GameObj.game_over){
+    bool play_game = true;
+    GameObj.initial_zobrist_hash(player);
+    while(!GameObj.game_over && play_game){
         disp_board(GameObj.game_board);
         cout<<"\n"<<player<<"\'s Turn";
-        if(player == human){
+        if(player == human || multiplayer){
             cout<<"\nEnter Current & Target: ";
             cin>>notation_current;
             cin>>notation_target;
@@ -52,7 +56,7 @@ int main()
         }
         else{
             auto start = high_resolution_clock::now();
-            a = call_ai(GameObj, player, 4);
+            a = call_ai(GameObj, player, 3);
             auto stop = high_resolution_clock::now();
             auto duration = duration_cast<milliseconds>(stop - start);
             cout<<'\n'<<a.current<<' '<<a.target<<' '<<duration.count()<<endl;

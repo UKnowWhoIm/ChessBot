@@ -8,6 +8,8 @@
 #include <map>
 #include <iostream>
 #include <chrono>
+#include <random>
+#include <fstream>
 
 using namespace std;
 
@@ -35,6 +37,22 @@ struct Move{
 
 class game
 {
+    static map<char, short> init_map(){
+        map<char, short> index;
+        index['P'] = 1; /// White pawn
+        index['p'] = index['P'] + 56; /// Black pawn
+        index['N'] = index['p'] + 56; /// White knight
+        index['n'] = index['N'] + 64; /// Black knight
+        index['B'] = index['n'] + 64; /// White bishop
+        index['b'] = index['B'] + 64; /// Black bishop
+        index['R'] = index['b'] + 64; /// White Rook
+        index['r'] = index['R'] + 64; /// Black Rook
+        index['Q'] = index['r'] + 64; /// White Queen
+        index['q'] = index['Q'] + 64; /// Black Queen
+        index['K'] = index['q'] + 64; /// White King
+        index['k'] = index['K'] + 64; /// Black King
+        return index;
+    }
     public:
         game();
         game(const game&);
@@ -67,10 +85,20 @@ class game
         bitset<64> black_occupied;
         array <bitset<64>, 64> target_areas;
 
+        /// TT members
+        void initial_zobrist_hash(string);
+        void update_zobrist_val(short, short, char, char);
+        unsigned long long zobrist_val;
+        static map<char, short> TT_INDEXES;
+        static short tt_castle_start_index;
+        static short tt_en_passant_start;
+
 };
 
 
+
 void disp_board(bitset<64>);
+void initialize_prn(bool=false);
 Move call_ai(game, string, short);
 
 // For debugging purposes only, Delete in production
