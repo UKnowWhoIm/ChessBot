@@ -73,6 +73,8 @@ map<char, long> piece_vals =
 
 const short KillerSize = 3;
 
+const int HashSize = 10000;
+
 const short depth_max = 8;
 
 array<array<Move, KillerSize>, depth_max> KillerMoves;
@@ -791,15 +793,57 @@ game::~game()
 // AI functions
 
 class HashEntry{
-    // TODO
+
+    bool ancient;
+
+    public:
     short depth;
     unsigned long long zobrist;
-    public:
-    HashEntry(short _depth, unsigned long long _zobrist){
+    long score;
+    short type; /// 1 -> beta cutoff(>=score) , 0 -> exact evaluation(=score), -1 -> alpha cutoff(<=score)
+    HashEntry(short _depth, unsigned long long _zobrist, short _type, long _score){
         this->depth = _depth;
         this->zobrist = _zobrist;
+        this->type = _type;
+        this->score = _score;
+        this->ancient = false;
+    }
+    HashEntry(){
+        this->ancient = true;
+    }
+    bool replace_hash(HashEntry new_hash){
+        if(this->ancient)
+            /// This hash is unused
+            return true;
+        if(this->depth > new_hash.depth)
+            /// This hash searched deeper
+            return false;
+        if(this->depth < new_hash.depth)
+            /// New hash searched deeper
+            return true;
+        if(new_hash.type == 0)
+            /// New hash has exact value
+            return true;
+        if(this->type == 0)
+            /// Old hash has exact value
+            return false;
+        if(this->type == new_hash.type && this->type == -1){
+            /// Both have alpha cutoffs, store the 1 with higher cutoff
+            return (this->score > new_hash.score);
+        }
+        if(this->type == new_hash.type && this->type == 1){
+            /// Both have beta cutoffs, store the 1 with lower cutoff
+            return (this->score < new_hash.score);
+        }
+        /// Store new one by default
+        return true;
+    }
+    void looked(){
+        this->ancient = false;
     }
 };
+
+array<HashEntry, HashSize> trans_tables;
 
 void initialize_prn(bool debug){
     /// Run once in begining to initialize PRN
@@ -860,6 +904,8 @@ void game::update_zobrist_val(short current, short target, char new_piece, char 
 }
 
 long nodes = 0;
+
+long tt_saves = 0;
 
 long heuristic(game GameObj, string player, string max_player){
     int score = 0, player_score = 0, enemy_score = 0;
@@ -1016,7 +1062,39 @@ short num_player(string player){
 }
 
 long negamax(game GameObj, string player, short depth, long alpha, long beta, bool null_move){
-    if(depth == 0)
+
+
+    HashEntry this_state = trans_tables[GameObj.zobrist_val % HashSize];
+    if(this_state.zobrist == GameObj.zobrist_val){
+        // Found an entry
+        trans_tables[GameObj.zobrist_val % HashSize].looked();
+        if(this_state.depth >= depth){
+            if(this_state.type == 0){
+                tt_saves += 1;
+                return this_state.score;
+            }
+            else if(this_state.type == 1){
+                // Beta cutoff
+                if(alpha >= this_state.score){
+                    // Alpha >= Beta
+                    tt_saves += 1;
+                    return this_state.score;
+                }
+                beta = this_state.score < beta ? this_state.score : beta;
+            }
+            else if(this_state.type == -1){
+                // Alpha cutoff
+                if(beta <= this_state.score){
+                    // Beta <= Alpha
+                    tt_saves += 1;
+                    return this_state.score;
+                }
+                alpha = this_state.score > alpha ? this_state.score : alpha;
+            }
+        }
+
+    }
+    if(depth < 1)
         return heuristic(GameObj, player, player);
         //return quiescence_search(GameObj, player, alpha, beta);
 
@@ -1040,17 +1118,24 @@ long negamax(game GameObj, string player, short depth, long alpha, long beta, bo
             // Non capture move that causes a beta cutoff = Killer Move
             if(!GameObj.is_capture(i->current, i->target, player))
                 insert_killer(*i, depth);
+            // Store beta cutoff
+            this_state = HashEntry(depth, GameObj.zobrist_val, 1, beta);
+            if(trans_tables[this_state.zobrist % HashSize].replace_hash(this_state))
+                trans_tables[this_state.zobrist % HashSize] = this_state;
             return beta;
         }
         alpha = val > alpha ? val : alpha;
     }
+    this_state = HashEntry(depth, GameObj.zobrist_val, 0, alpha);
+    if(trans_tables[this_state.zobrist % HashSize].replace_hash(this_state))
+        trans_tables[this_state.zobrist % HashSize] = this_state;
     return alpha;
 }
 
 Move call_ai(game GameObj, string player, short depth){
     long temp_val;
     long best_val = -pow(10, 5);
-
+    nodes = 0;
     // Reset Killers
     for(short i = 0; i < depth_max; i++)
         for(short j = 0; j < KillerSize; j++)
@@ -1070,7 +1155,7 @@ Move call_ai(game GameObj, string player, short depth){
             best_val = temp_val;
         }
     }
-    cout<<"Nodes "<<nodes<<' '<<best_val;
+    cout<<"Nodes "<<nodes<<' '<<best_val<<' '<<tt_saves;
     return move_pos;
 }
 

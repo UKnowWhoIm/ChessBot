@@ -38,14 +38,13 @@ int main()
     Move a;
     int target, current;
     bool status;
-    bool multiplayer = false;
-    //disp_board(GameObj.get_true_target_area(28, WHITE));
+    bool ai_only = false;
     bool play_game = true;
     GameObj.initial_zobrist_hash(player);
     while(!GameObj.game_over && play_game){
         disp_board(GameObj.game_board);
         cout<<"\n"<<player<<"\'s Turn";
-        if(player == human || multiplayer){
+        if(player == human && !ai_only){
             cout<<"\nEnter Current & Target: ";
             cin>>notation_current;
             cin>>notation_target;
