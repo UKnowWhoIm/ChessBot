@@ -1141,6 +1141,11 @@ Move call_ai(game GameObj, string player, short depth){
         for(short j = 0; j < KillerSize; j++)
             KillerMoves[i][j] = Move(-1, -1);
 
+    /// THIS IS IMPORTANT(DONT REMOVE)
+    short multiplier = -1;
+    if(depth % 2 == 1)
+        multiplier = 1;
+
     Move move_pos(-1, -1);
     vector<Move> moves = GameObj.get_all_moves(player, false);
     game tempObj;
@@ -1148,7 +1153,7 @@ Move call_ai(game GameObj, string player, short depth){
         tempObj = game(GameObj);
         tempObj.make_move(temp->current, temp->target, player, false, true);
         //temp_val = minimax(tempObj, player, reverse_player(player), false, depth - 1, alpha, beta, false);
-        temp_val = -negamax(tempObj, reverse_player(player), depth - 1, -pow(10, 5), -best_val, false);
+        temp_val = multiplier * negamax(tempObj, reverse_player(player), depth - 1, -pow(10, 5), -best_val, false);
         //cout<<temp->score<<" Score "<<temp_val<<endl;
         if(temp_val > best_val){
             move_pos = Move(temp->current, temp->target);
