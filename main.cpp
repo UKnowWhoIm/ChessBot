@@ -38,7 +38,7 @@ int main()
     Move a;
     int target, current;
     bool status;
-    bool multiplayer = true;
+    bool multiplayer = false;
     //disp_board(GameObj.get_true_target_area(28, WHITE));
     bool play_game = true;
     GameObj.initial_zobrist_hash(player);
@@ -56,7 +56,7 @@ int main()
         }
         else{
             auto start = high_resolution_clock::now();
-            a = call_ai(GameObj, player, 3);
+            a = call_ai(GameObj, player, 4);
             auto stop = high_resolution_clock::now();
             auto duration = duration_cast<milliseconds>(stop - start);
             cout<<'\n'<<a.current<<' '<<a.target<<' '<<duration.count()<<endl;
