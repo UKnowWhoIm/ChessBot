@@ -73,7 +73,7 @@ map<char, long> piece_vals =
 
 const short KillerSize = 3;
 
-const int HashSize = 10000;
+const unsigned long HashSize = pow(10, 7);
 
 const short depth_max = 8;
 
@@ -793,10 +793,8 @@ game::~game()
 // AI functions
 
 class HashEntry{
-
-    bool ancient;
-
     public:
+    bool ancient;
     short depth;
     unsigned long long zobrist;
     long score;
@@ -810,11 +808,12 @@ class HashEntry{
     }
     HashEntry(){
         this->ancient = true;
+        this->depth = -1;
     }
     bool replace_hash(HashEntry new_hash){
-        if(this->ancient)
-            /// This hash is unused
-            return true;
+        if(!this->ancient)
+            /// This hash is not old
+            return false;
         if(this->depth > new_hash.depth)
             /// This hash searched deeper
             return false;
@@ -928,7 +927,9 @@ long heuristic(game GameObj, string player, string max_player){
                 pos_multiplier = 1;
 
             initial_rank = (i > 7 && i < 16 && get_player(GameObj.game_board[i]) == BLACK) || (i > 47 && i < 56 && get_player(GameObj.game_board[i]) == WHITE);
-            score += piece_vals[GameObj.game_board[i]];
+
+            score += piece_vals[GameObj.game_board[i]] * piece_multiplier;
+
             if(get_player(GameObj.game_board[i]) == player)
                 player_score += abs(piece_multiplier * piece_vals[GameObj.game_board[i]]);
             else
@@ -978,24 +979,24 @@ void insert_killer(Move m, short depth){
 
 const short R = 2;
 
-int quiescence_search(game GameObj, string player, int alpha, int beta){
-
-    long stand_pat = heuristic(GameObj, player, player);
-
-
+long quiescence_search(game GameObj, string player, long alpha, long beta){
+    long stand_pat = LONG_MIN;
+    if(!GameObj.is_check(player))
+        stand_pat = heuristic(GameObj, player, player);
+    cout<<beta<<' '<<stand_pat<<endl;
     if(stand_pat >= beta)
         return beta;
 
     long val;
-    int delta = 1000; // Queen Value
+    short delta = 500; // Rook Value
     game tempObj;
-
-    alpha = stand_pat > alpha ? stand_pat : alpha;
 
     // Delta pruning
     if(stand_pat < alpha - delta && individual_score(GameObj, player) - pow(10, 7) >=  late_game_cutoff)
         // Cannot improve alpha
         return alpha;
+
+    alpha = stand_pat > alpha ? stand_pat : alpha;
 
     vector<Move> captures = GameObj.get_all_moves(player, false, true);
 
@@ -1005,9 +1006,7 @@ int quiescence_search(game GameObj, string player, int alpha, int beta){
         val = -quiescence_search(tempObj, reverse_player(player), -beta, -alpha);
         if(val >= beta)
             return beta;
-
         alpha = val > alpha ? val : alpha;
-
     }
     return alpha;
 
@@ -1055,44 +1054,39 @@ int minimax(game GameObj, string max_player, string player, bool is_max, short d
     }
 }
 
-short num_player(string player){
-    if(player == WHITE)
-        return 1;
-    return -1;
-}
+map<short, bool> depth_reset;
 
-long negamax(game GameObj, string player, short depth, long alpha, long beta, bool null_move){
-
+long negamax(game GameObj, string player, short depth, long alpha, long beta, bool null_move, bool use_tt=true){
+    /// Reset the tt age ONLY once every depth
+    if(!depth_reset[depth] && use_tt){
+        for(int i = 0; i < HashSize  ; i++)
+            trans_tables[i].ancient = true;
+        depth_reset[depth] = true;
+    }
 
     HashEntry this_state = trans_tables[GameObj.zobrist_val % HashSize];
-    if(this_state.zobrist == GameObj.zobrist_val){
+    if(this_state.zobrist == GameObj.zobrist_val && use_tt){
         // Found an entry
+        tt_saves++;
         trans_tables[GameObj.zobrist_val % HashSize].looked();
         if(this_state.depth >= depth){
-            if(this_state.type == 0){
-                tt_saves += 1;
+            if(this_state.type == 0)
+                // Exact
                 return this_state.score;
-            }
+
             else if(this_state.type == 1){
                 // Beta cutoff
-                if(alpha >= this_state.score){
-                    // Alpha >= Beta
-                    tt_saves += 1;
+                if(this_state.score >= beta)
                     return this_state.score;
-                }
                 beta = this_state.score < beta ? this_state.score : beta;
             }
             else if(this_state.type == -1){
                 // Alpha cutoff
-                if(beta <= this_state.score){
-                    // Beta <= Alpha
-                    tt_saves += 1;
+                if(this_state.score <= alpha)
                     return this_state.score;
-                }
                 alpha = this_state.score > alpha ? this_state.score : alpha;
             }
         }
-
     }
     if(depth < 1)
         return heuristic(GameObj, player, player);
@@ -1100,7 +1094,7 @@ long negamax(game GameObj, string player, short depth, long alpha, long beta, bo
 
     // Null move pruning
     if(!null_move && check_null_move(GameObj, player) && depth > R){
-        int val = -negamax(GameObj, reverse_player(player), depth - R - 1, -beta, -beta + 10, true);
+        int val = -negamax(GameObj, reverse_player(player), depth - R - 1, -beta, -beta + 10, true, use_tt);
         if(val >= beta)
             return beta;
     }
@@ -1108,12 +1102,12 @@ long negamax(game GameObj, string player, short depth, long alpha, long beta, bo
 
     game tempObj;
     long val;
-    vector<Move> moves = GameObj.get_all_moves(player, false);
+    vector<Move> moves = GameObj.get_all_moves(player, false, false, depth);
 
     for(auto i = moves.begin();i != moves.end(); i++){
         tempObj = game(GameObj);
         tempObj.make_move(i->current, i->target, player, false, true);
-        val = -negamax(tempObj, reverse_player(player), depth - 1, -beta, -alpha, null_move);
+        val = -negamax(tempObj, reverse_player(player), depth - 1, -beta, -alpha, null_move, use_tt);
         if(val >= beta){
             // Non capture move that causes a beta cutoff = Killer Move
             if(!GameObj.is_capture(i->current, i->target, player))
@@ -1125,42 +1119,67 @@ long negamax(game GameObj, string player, short depth, long alpha, long beta, bo
             return beta;
         }
         alpha = val > alpha ? val : alpha;
+        if(alpha >= beta)
+            break;
     }
-    this_state = HashEntry(depth, GameObj.zobrist_val, 0, alpha);
+    short flag=0;
+    if(alpha >= beta)
+        // Alpha Cutoff
+        flag = -1;
+
+    this_state = HashEntry(depth, GameObj.zobrist_val, flag, alpha);
     if(trans_tables[this_state.zobrist % HashSize].replace_hash(this_state))
         trans_tables[this_state.zobrist % HashSize] = this_state;
     return alpha;
 }
 
-Move call_ai(game GameObj, string player, short depth){
-    long temp_val;
+Move negamax_root(game GameObj, string player, short depth){
+    // Negamax Root Call
     long best_val = -pow(10, 5);
+    long temp_val;
+
+    Move move_pos(-1, -1);
+    vector<Move> moves = GameObj.get_all_moves(player, false, false, depth);
+    game tempObj;
+    for(auto temp = moves.begin();temp != moves.end(); temp++){
+        tempObj = game(GameObj);
+        tempObj.make_move(temp->current, temp->target, player, false, true);
+        temp_val = -negamax(tempObj, reverse_player(player), depth - 1, -pow(10, 5), -best_val, false);
+        if(temp_val > best_val){
+            move_pos = *temp;
+            best_val = temp_val;
+        }
+    }
+    cout<<best_val<<' ';
+    return move_pos;
+}
+
+Move call_ai(game GameObj, string player, short depth){
+
+
     nodes = 0;
+    tt_saves = 0;
+
+    // Set all entries to ancient TT
+    for(short i=depth;i>=0;i--)
+        depth_reset[i]=false;
+    for(int i = 0; i < HashSize  ; i++)
+            trans_tables[i].ancient = true;
+
     // Reset Killers
     for(short i = 0; i < depth_max; i++)
         for(short j = 0; j < KillerSize; j++)
             KillerMoves[i][j] = Move(-1, -1);
 
-    /// THIS IS IMPORTANT(DONT REMOVE)
-    short multiplier = -1;
-    if(depth % 2 == 1)
-        multiplier = 1;
+    const short shallow_depth = 3;
 
-    Move move_pos(-1, -1);
-    vector<Move> moves = GameObj.get_all_moves(player, false);
-    game tempObj;
-    for(auto temp = moves.begin();temp != moves.end(); temp++){
-        tempObj = game(GameObj);
-        tempObj.make_move(temp->current, temp->target, player, false, true);
-        //temp_val = minimax(tempObj, player, reverse_player(player), false, depth - 1, alpha, beta, false);
-        temp_val = multiplier * negamax(tempObj, reverse_player(player), depth - 1, -pow(10, 5), -best_val, false);
-        //cout<<temp->score<<" Score "<<temp_val<<endl;
-        if(temp_val > best_val){
-            move_pos = Move(temp->current, temp->target);
-            best_val = temp_val;
-        }
+    Move first_move;
+    if(depth > shallow_depth){
+        // Find the best move for this depth and use it as the 1st move
+        //first_move = negamax_root(GameObj, player, shallow_depth);
     }
-    cout<<"Nodes "<<nodes<<' '<<best_val<<' '<<tt_saves;
-    return move_pos;
+    Move best_move = negamax_root(GameObj, player, depth);
+    cout<<"Nodes "<<nodes<<' '<<tt_saves;
+    return best_move;
 }
 
