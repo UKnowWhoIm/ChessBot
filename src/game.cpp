@@ -68,6 +68,7 @@ map<char, long> piece_vals =
     {'R', -500},
     {'Q', -1000},
     {'K', -pow(10, 7)},
+    {'f', 0},
 
 };
 
@@ -623,6 +624,8 @@ bool game::make_move(Move m, string player, bool _reverse, bool ai){
         this->set_occupied(reverse_player(player), enemy_pos, 0);
         this->target_areas[enemy_pos] = 0;
     }
+    if(ai && _reverse)
+        ai = false;
     bool checked_;
     if (!ai)
         checked_ = this->is_check(player);
@@ -1005,13 +1008,111 @@ void insert_killer(Move m, short depth){
     KillerMoves[depth][KillerSize - 1] = m;
 }
 
+vector<Move> get_legal_evasions(game GameObj, short target, string player, vector<Move>& moves){
+    long enemy_piece_val = piece_vals[GameObj.game_board[target]];
+        for(short i=0; i < 64; i++){
+            if(get_player(GameObj.game_board[i]) == player)
+                if(test_bit(GameObj.get_true_target_area(i, player), target)){
+                    if(GameObj.make_move(Move(i, target), player, true, true))
+                        moves.push_back( Move(i, target, piece_vals[GameObj.game_board[i]] - enemy_piece_val) );
+                }
+        }
+    return moves;
+}
+
+vector<Move> check_evasion(game GameObj, string player){
+    // Player is checked
+    vector<Move> moves;
+    char king;
+    short king_pos = find_king(GameObj.game_board, player);
+    if(king_pos == -1)
+        return moves;
+    if(player == WHITE)
+        king = 'K';
+    else
+        king = 'k';
+
+    vector<short> checked_pieces;
+    for(short i=0; i < 64; i++){
+        if(get_player(GameObj.game_board[i]) == reverse_player(player))
+            if(test_bit(GameObj.get_true_target_area(i, reverse_player(player)), king_pos))
+                checked_pieces.push_back(i);
+    }
+
+    /// Try all moves of king
+    vector<int> king_targets = get_true_pos(GameObj.get_true_target_area(king_pos, player));
+    for(auto i = king_targets.begin(); i != king_targets.end(); i++)
+        get_legal_evasions(GameObj, *i, player, moves);
+
+    if(checked_pieces.size() == 1){
+        /// Try to capture it
+        short enemy_pos = checked_pieces[0];
+        char enemy_piece = GameObj.game_board[enemy_pos];
+        get_legal_evasions(GameObj, enemy_pos, player, moves);
+
+        /// Block it
+        if(!(tolower(enemy_piece) == 'p' || tolower(enemy_piece) == 'n' || tolower(enemy_piece) == 'k')){
+            signed short updation = 1000;
+            short a = 0;
+            if(tolower(enemy_piece) == 'r' || tolower(enemy_piece) == 'q'){
+                if(floor(enemy_pos / 8) == floor(king_pos / 8)){
+                    /// Horizontal
+                    updation = (enemy_pos - king_pos) / abs(enemy_pos - king_pos);
+                }
+                else if(enemy_pos % 8 == king_pos % 8){
+                    /// Vertical
+                    updation = ((enemy_pos - king_pos)/abs(enemy_pos - king_pos)) * 8;
+                }
+            }
+            if(tolower(enemy_piece) == 'b' || tolower(enemy_piece) == 'q'){
+                if((enemy_pos - king_pos) % 7 == 0){
+                    /// anti diagonal
+                    updation = ((enemy_pos - king_pos) / abs(enemy_pos - king_pos) ) * 7;
+                }
+                else if((enemy_pos - king_pos) % 9 == 0){
+                    /// main diagonal
+                    updation = ((enemy_pos - king_pos) / abs(enemy_pos - king_pos) ) * 9;
+                }
+            }
+            for(short i = king_pos + updation; i != enemy_pos; i+=updation){
+                get_legal_evasions(GameObj, i, player, moves);
+            }
+        }
+    }
+    sort(moves.begin(), moves.end(), comparer);
+    return moves;
+}
+
 const short R = 2;
 
-long quiescence_search(game GameObj, string player, long alpha, long beta){
-    long stand_pat = LONG_MIN;
-    if(!GameObj.is_check(player))
-        stand_pat = heuristic(GameObj, player, player);
-    if(stand_pat >= beta)
+long quiescence_search(game GameObj, string player, long alpha, long beta, bool use_tt){
+    HashEntry this_state = trans_tables[GameObj.zobrist_val % HashSize];
+    if(this_state.zobrist == GameObj.zobrist_val && use_tt){
+        // Found an entry
+        tt_saves++;
+        trans_tables[GameObj.zobrist_val % HashSize].looked();
+
+        if(this_state.type == 0)
+            // Exact
+            return this_state.score;
+
+        else if(this_state.type == 1){
+            // Beta cutoff
+            if(this_state.score >= beta)
+                return this_state.score;
+            beta = this_state.score;
+        }
+        else if(this_state.type == -1){
+            // Alpha cutoff
+            if(this_state.score <= alpha)
+                return this_state.score;
+            alpha = this_state.score;
+        }
+
+    }
+    bool is_check = GameObj.is_check(player);
+    long stand_pat = heuristic(GameObj, player, player);
+    if(stand_pat >= beta && !is_check)
         return beta;
 
     long val;
@@ -1019,23 +1120,30 @@ long quiescence_search(game GameObj, string player, long alpha, long beta){
     game tempObj;
 
     // Delta pruning
-    if(stand_pat < alpha - delta && individual_score(GameObj, player) - pow(10, 7) >=  late_game_cutoff)
+    if(!is_check && stand_pat < alpha - delta && individual_score(GameObj, player) - pow(10, 7) >=  late_game_cutoff)
         // Cannot improve alpha
         return alpha;
+    if(!is_check)
+        alpha = stand_pat > alpha ? stand_pat : alpha;
 
-    alpha = stand_pat > alpha ? stand_pat : alpha;
+    vector<Move> captures;
 
-    vector<Move> captures = GameObj.get_all_moves(player, false, true);
+    if(!is_check)
+        captures = GameObj.get_all_moves(player, false, true);
+    else
+        captures = check_evasion(GameObj, player);
 
     for(auto i = captures.begin();i != captures.end(); i++){
         tempObj = game(GameObj);
         tempObj.make_move(*i, player, false, true);
-        val = -quiescence_search(tempObj, reverse_player(player), -beta, -alpha);
+        val = -quiescence_search(tempObj, reverse_player(player), -beta, -alpha, use_tt);
         if(val >= beta)
             return beta;
         alpha = val > alpha ? val : alpha;
     }
-
+    this_state = HashEntry(0, GameObj.zobrist_val, 0, alpha);
+    if(trans_tables[this_state.zobrist % HashSize].replace_hash(this_state))
+        trans_tables[this_state.zobrist % HashSize] = this_state;
     return alpha;
 
 }
@@ -1117,8 +1225,8 @@ long negamax(game GameObj, string player, short depth, long alpha, long beta, bo
         }
     }
     if(depth < 1)
-        return heuristic(GameObj, player, player);
-        //return quiescence_search(GameObj, player, alpha, beta);
+        //return heuristic(GameObj, player, player);
+        return quiescence_search(GameObj, player, alpha, beta, use_tt);
 
     // Null move pruning
     if(!null_move && check_null_move(GameObj, player) && depth > R){
@@ -1204,12 +1312,14 @@ Move call_ai(game GameObj, string player, short depth){
 
     const short shallow_depth = 3;
 
+    bool use_tt = true;
+
     Move first_move;
     if(depth > shallow_depth){
         // Find the best move for this depth and use it as the 1st move
         //first_move = negamax_root(GameObj, player, shallow_depth);
     }
-    Move best_move = negamax_root(GameObj, player, depth);
+    Move best_move = negamax_root(GameObj, player, depth, use_tt);
     cout<<"Nodes "<<nodes<<' '<<tt_saves;
     return best_move;
 }

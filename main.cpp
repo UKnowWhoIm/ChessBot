@@ -60,11 +60,7 @@ int main()
     bool multiplayer = true;
     GameObj.initial_zobrist_hash(player);
 
-    process_move_file(GameObj);
-
-    disp_board(GameObj.game_board);
-
-    disp_board(GameObj.target_areas.at(52));
+    //process_move_file(GameObj);
 
     cout<<endl<<GameObj.white_castle[0]<<' '<<GameObj.white_castle[1];
     while(!GameObj.game_over && play_game){
@@ -88,7 +84,11 @@ int main()
             auto stop = std::chrono::high_resolution_clock::now();
             auto duration = std::chrono::duration_cast<std::chrono::milliseconds>(stop - start);
             cout<<'\n'<<a.current<<' '<<a.target<<' '<<duration.count()<<endl;
-            dump_move(player, a);
+
+            //dump_move(player, a);
+            if(a == Move(-1, -1)){
+                // no moves
+            }
             status = GameObj.make_move(a, player, false, true);
         }
         if(status){
