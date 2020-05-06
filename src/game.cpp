@@ -97,7 +97,10 @@ void disp_board(string board){
     for(int i=0;i<64;i++){
         if(i % 8 == 0)
             cout<<"\n\n";
-        cout<<board[i]<<' ';
+        if(board[i] == 'f')
+            cout<<". ";
+        else
+            cout<<board[i]<<' ';
 
     }
 }
@@ -432,7 +435,14 @@ void game::update_status(string player){
 }
 
 bool game::promote_pawn(int current, char piece, string player, bool ai=false){
+    if(ai){
+        // AI CALL
+        this->game_board[current] = piece;
+        this->target_areas[current] = get_valid_moves(this->game_board, current, player, this->white_castle, this->black_castle);
+        return true;
+    }
     if(this->pawn_promotion == current){
+        // PLAYER CALL
         if(tolower(piece) == 'r' || tolower(piece) == 'q' || tolower(piece) == 'q'){
             if(player == WHITE)
                 piece = toupper(piece);
@@ -440,10 +450,8 @@ bool game::promote_pawn(int current, char piece, string player, bool ai=false){
                 piece = tolower(piece);
             this->game_board[current] = piece;
             this->target_areas[current] = get_valid_moves(this->game_board, current, player, this->white_castle, this->black_castle);
-            if(!ai){
-                this->update_status(player);
-                this->checked = this->is_check(player);
-            }
+            this->update_status(player);
+            this->checked = this->is_check(player);
             return true;
         }
     }
@@ -525,7 +533,7 @@ vector<Move> game::get_all_moves(string player, bool legal, bool capture_only, s
             temp = get_true_pos(this->get_true_target_area(i, player));
             for(auto j=temp.begin(); j != temp.end(); j++){
                 if(legal)
-                    if(!this->make_move(i, *j, player, true, false))
+                    if(!this->make_move(Move(i, *j), player, true, false))
                         continue;
                 if(this->is_capture(i, *j, player)){
                     captures.push_back(Move(i, *j, piece_vals[this->game_board[i] * multiplier] - piece_vals[this->game_board[*j]] * multiplier));
@@ -552,36 +560,50 @@ vector<Move> game::get_all_moves(string player, bool legal, bool capture_only, s
     return all_moves;
 }
 
-bool game::make_move(short current, short target, string player, bool _reverse, bool ai){
+bool game::make_move(Move m, string player, bool _reverse, bool ai){
     if(!ai){
-        if(get_player(this->game_board[current]) != player)
+        if(get_player(this->game_board[m.current]) != player)
             return false;
-        if(!test_bit(this->get_true_target_area(current, player), target))
+        if(!test_bit(this->get_true_target_area(m.current, player), m.target))
             return false;
     }
 
     bitset<64> move_board(0);
-    set_bit(move_board, current);
-    set_bit(move_board, target);
+    set_bit(move_board, m.current);
+    set_bit(move_board, m.target);
     // These are the steps that should be reversed to restore game to previous state
-    char old_piece = this->game_board[target];
-    this->game_board[target] = this->game_board[current];
-    this->game_board[current] = 'f';
+    char old_piece = this->game_board[m.target];
+    this->game_board[m.target] = this->game_board[m.current];
+    this->game_board[m.current] = 'f';
     char en_passant_piece;
+    array<bool, 2> old_castle;
+    bool change_castle = false;
+    if(tolower(this->game_board[m.target]) == 'k' && abs(m.current - m.target) != 2){
+        /// King has made a non-castle move, so suspend castling rights
+        change_castle = true;
+        if(player == WHITE){
+            old_castle = this->white_castle;
+            this->white_castle = {false, false};
+        }
+        else{
+            old_castle = this->black_castle;
+            this->black_castle = {false, false};
+        }
+    }
     bool is_en_passant = false;
     short en_passant_pos;
-    this->set_occupied(player, target, 1);
-    this->set_occupied(player, current, 0);
+    this->set_occupied(player, m.target, 1);
+    this->set_occupied(player, m.current, 0);
     // Essential For Captures
-    this->set_occupied(reverse_player(player), target, 0);
+    this->set_occupied(reverse_player(player), m.target, 0);
     array <bitset<64>, 64> old_target_area;
     old_target_area = this->target_areas;
-    bool last_rank = (target < 64 && target > 55 && player == BLACK) || (target < 8 && target >= 0 && player == WHITE);
-    if(tolower(this->game_board[target]) == 'p' && last_rank)
-        this->target_areas[target] = 0;
+    bool last_rank = (m.target < 64 && m.target > 55 && player == BLACK) || (m.target < 8 && m.target >= 0 && player == WHITE);
+    if(tolower(this->game_board[m.target]) == 'p' && last_rank)
+        this->target_areas[m.target] = 0;
     else
-        this->target_areas[target] = get_valid_moves(this->game_board, target, player, this->white_castle, this->black_castle);
-    this->target_areas[current] = 0;
+        this->target_areas[m.target] = get_valid_moves(this->game_board, m.target, player, this->white_castle, this->black_castle);
+    this->target_areas[m.current] = 0;
 
     for(int i = 0; i < 64; i++)
         if((this->target_areas[i] & move_board).any())
@@ -589,12 +611,12 @@ bool game::make_move(short current, short target, string player, bool _reverse, 
             this->target_areas[i] = get_valid_moves(this->game_board, i, get_player(this->game_board[i]), this->white_castle, this->black_castle);
 
     // Implementing En Passant
-    if(this->en_passant == target && tolower(this->game_board[target]) == 'p' && old_piece == 'f'){
+    if(this->en_passant == m.target && tolower(this->game_board[m.target]) == 'p' && old_piece == 'f'){
         is_en_passant = true;
         short dirn = 1;
         if(player == WHITE)
             dirn = -1;
-        short enemy_pos = target - dirn*8;
+        short enemy_pos = m.target - dirn*8;
         en_passant_piece = this->game_board[enemy_pos];
         en_passant_pos = enemy_pos;
         this->game_board[enemy_pos] = 'f';
@@ -608,20 +630,26 @@ bool game::make_move(short current, short target, string player, bool _reverse, 
         checked_ = false;
     if(_reverse || checked_){
         this -> target_areas = old_target_area;
-        this -> game_board[current] = this->game_board[target];
-        this -> game_board[target] = old_piece;
-        this -> set_occupied(player, current, 1);
-        this -> set_occupied(player, target, 0);
+        this -> game_board[m.current] = this->game_board[m.target];
+        this -> game_board[m.target] = old_piece;
+        this -> set_occupied(player, m.current, 1);
+        this -> set_occupied(player, m.target, 0);
 
         // reversing capture
         if(old_piece != 'f')
-            this -> set_occupied(reverse_player(player), target, 1);
+            this -> set_occupied(reverse_player(player), m.target, 1);
         // reversing en passant
         if(is_en_passant){
             this->game_board[en_passant_pos] = en_passant_piece;
             this->set_occupied(reverse_player(player), en_passant_pos, 1);
         }
-
+        // reversing castling rights
+        if(change_castle){
+            if(player == WHITE)
+                this->white_castle = old_castle;
+            else
+                this->black_castle = old_castle;
+        }
         return !checked_;
     }
     if(old_piece != 'f')
@@ -639,7 +667,7 @@ bool game::make_move(short current, short target, string player, bool _reverse, 
         this->zobrist_val ^= PRN[this->tt_en_passant_start + this->en_passant % 8];
         //cout<<this->tt_en_passant_start + this->en_passant % 8<<" Removal of previous en Passant\n";
     }
-    if(tolower(this->game_board[target]) == 'r'){
+    if(tolower(this->game_board[m.target]) == 'r'){
         int left, right;
         if(player == WHITE){
             left = 56;
@@ -650,7 +678,7 @@ bool game::make_move(short current, short target, string player, bool _reverse, 
             right = 7;
         }
         // For TT Castle Ref see line 40
-        if(current == left){
+        if(m.current == left){
             if(player == WHITE && this->white_castle[0]){
                 this->white_castle[0] = false;
                 this->zobrist_val ^= PRN[this->tt_castle_start_index + 0 + 0];
@@ -662,7 +690,7 @@ bool game::make_move(short current, short target, string player, bool _reverse, 
                 //cout<<"Black Castle[0] @ "<<this->tt_castle_start_index + 4 + 0<<endl;
             }
         }
-        else if(current == right){
+        else if(m.current == right){
             if(player == WHITE && this->white_castle[1]){
                 this->white_castle[1] = false;
                 this->zobrist_val ^= PRN[this->tt_castle_start_index + 2 + 0];
@@ -675,39 +703,39 @@ bool game::make_move(short current, short target, string player, bool _reverse, 
             }
         }
     }
-    else if(tolower(this->game_board[target]) == 'k'){
+    else if(tolower(this->game_board[m.target]) == 'k'){
         char rook;
         if(player == WHITE)
             rook = 'R';
         else
             rook = 'r';
-        if(abs(target - current) == 2){
-            if(target == current - 2){
+        if(abs(m.target - m.current) == 2){
+            if(m.target == m.current - 2){
                 // Queen Side
-                this->game_board[target + 1] = rook;
-                this->game_board[target - 2] = 'f';
-                this->target_areas[target + 1] = get_valid_moves(this->game_board, target + 1,  player, {false, false}, {false, false});
-                this->set_occupied(player, target - 2, 0);
-                this->set_occupied(player, target + 1, 1);
-                this->target_areas[target - 2] = 0;
+                this->game_board[m.target + 1] = rook;
+                this->game_board[m.target - 2] = 'f';
+                this->target_areas[m.target + 1] = get_valid_moves(this->game_board, m.target + 1,  player, {false, false}, {false, false});
+                this->set_occupied(player, m.target - 2, 0);
+                this->set_occupied(player, m.target + 1, 1);
+                this->target_areas[m.target - 2] = 0;
                 // Remove Rook from initial
-                this->zobrist_val ^= PRN[TT_INDEXES[rook] + target - 2];
+                this->zobrist_val ^= PRN[TT_INDEXES[rook] + m.target - 2];
                 // Fix rook at target
-                this->zobrist_val ^= PRN[TT_INDEXES[rook] + target + 1];
+                this->zobrist_val ^= PRN[TT_INDEXES[rook] + m.target + 1];
 
             }
             else{
                 // King Side
-                this->game_board[target - 1] = rook;
-                this->game_board[target + 1] = 'f';
-                this->target_areas[target - 1] = get_valid_moves(this->game_board, target - 1,  player, {false, false}, {false, false});
-                this->set_occupied(player, target - 1, 1);
-                this->set_occupied(player, target + 1, 0);
-                this->target_areas[target + 1] = 0;
+                this->game_board[m.target - 1] = rook;
+                this->game_board[m.target + 1] = 'f';
+                this->target_areas[m.target - 1] = get_valid_moves(this->game_board, m.target - 1,  player, {false, false}, {false, false});
+                this->set_occupied(player, m.target - 1, 1);
+                this->set_occupied(player, m.target + 1, 0);
+                this->target_areas[m.target + 1] = 0;
                 // Remove Rook from initial
-                this->zobrist_val ^= PRN[TT_INDEXES[rook] + target + 1];
+                this->zobrist_val ^= PRN[TT_INDEXES[rook] + m.target + 1];
                 // Fix rook at target
-                this->zobrist_val ^= PRN[TT_INDEXES[rook] + target - 1];
+                this->zobrist_val ^= PRN[TT_INDEXES[rook] + m.target - 1];
             }
         }
         // For TT Castle Ref see line 40
@@ -734,7 +762,7 @@ bool game::make_move(short current, short target, string player, bool _reverse, 
             this->black_castle = {false, false};
         }
     }
-    else if(tolower(this->game_board[target]) == 'p'){
+    else if(tolower(this->game_board[m.target]) == 'p'){
         // Setting Up Pawn Promotion
         short dirn = 1;
         char ai_piece = 'q';
@@ -746,9 +774,9 @@ bool game::make_move(short current, short target, string player, bool _reverse, 
 
         if(last_rank){
             if(!ai)
-                this -> pawn_promotion = target;
+                this->pawn_promotion = m.target;
             else
-                this -> promote_pawn(target, ai_piece, player, true);
+                this->promote_pawn(m.target, ai_piece, player, true);
 
             return true;
         }
@@ -756,11 +784,11 @@ bool game::make_move(short current, short target, string player, bool _reverse, 
         // Setting Up En Passant
         bool initial_move;
         if(player == BLACK)
-            initial_move = current < 16 && current > 7 && target > 23 && target < 32;
+            initial_move = m.current < 16 && m.current > 7 && m.target > 23 && m.target < 32;
         else
-            initial_move = current < 56 && current > 47 && target < 40 && target > 31;
+            initial_move = m.current < 56 && m.current > 47 && m.target < 40 && m.target > 31;
         if(initial_move){
-            this->en_passant = target - dirn*8;
+            this->en_passant = m.target - dirn*8;
             this->zobrist_val ^= PRN[this->tt_en_passant_start + this->en_passant % 8];
             //cout<<this->tt_en_passant_start + this->en_passant % 8<<" HASHED EN PASSANT\n";
             //cout<<PRN[this->tt_en_passant_start + this->en_passant % 8]<<endl;
@@ -777,7 +805,7 @@ bool game::make_move(short current, short target, string player, bool _reverse, 
     }
 
     // Update position in zobrist(placed here to avoid cases of pawn promotion)
-    this->update_zobrist_val(current, target, this->game_board[target], old_piece);
+    this->update_zobrist_val(m.current, m.target, this->game_board[m.target], old_piece);
 
     // Switch Player in zobrist
     this->zobrist_val ^= PRN[0];
@@ -983,7 +1011,6 @@ long quiescence_search(game GameObj, string player, long alpha, long beta){
     long stand_pat = LONG_MIN;
     if(!GameObj.is_check(player))
         stand_pat = heuristic(GameObj, player, player);
-    cout<<beta<<' '<<stand_pat<<endl;
     if(stand_pat >= beta)
         return beta;
 
@@ -1002,12 +1029,13 @@ long quiescence_search(game GameObj, string player, long alpha, long beta){
 
     for(auto i = captures.begin();i != captures.end(); i++){
         tempObj = game(GameObj);
-        tempObj.make_move(i->current, i->target, player, false, true);
+        tempObj.make_move(*i, player, false, true);
         val = -quiescence_search(tempObj, reverse_player(player), -beta, -alpha);
         if(val >= beta)
             return beta;
         alpha = val > alpha ? val : alpha;
     }
+
     return alpha;
 
 }
@@ -1026,7 +1054,7 @@ int minimax(game GameObj, string max_player, string player, bool is_max, short d
     if(is_max){
         for(auto i = moves.begin();i != moves.end(); i++){
             tempObj = game(GameObj);
-            tempObj.make_move(i->current, i->target, player, false, true);
+            tempObj.make_move(*i, player, false, true);
             val = minimax(tempObj, max_player, reverse_player(player), false, depth - 1, alpha, beta, null_move);
             alpha = max(alpha, val);
             if(beta <= alpha)
@@ -1034,14 +1062,14 @@ int minimax(game GameObj, string max_player, string player, bool is_max, short d
 
         }
         if(alpha == -pow(10, 5)){
-                // TODO
+            // TODO
         }
         return alpha;
     }
     else{
         for(auto i = moves.begin();i != moves.end(); i++){
             tempObj = game(GameObj);
-            tempObj.make_move(i->current, i->target, player, false, true);
+            tempObj.make_move(*i, player, false, true);
             val = minimax(tempObj, max_player, reverse_player(player), true, depth - 1, alpha, beta, null_move);
             beta = min(beta, val);
             if(beta <= alpha)
@@ -1078,13 +1106,13 @@ long negamax(game GameObj, string player, short depth, long alpha, long beta, bo
                 // Beta cutoff
                 if(this_state.score >= beta)
                     return this_state.score;
-                beta = this_state.score < beta ? this_state.score : beta;
+                beta = this_state.score;
             }
             else if(this_state.type == -1){
                 // Alpha cutoff
                 if(this_state.score <= alpha)
                     return this_state.score;
-                alpha = this_state.score > alpha ? this_state.score : alpha;
+                alpha = this_state.score;
             }
         }
     }
@@ -1106,7 +1134,7 @@ long negamax(game GameObj, string player, short depth, long alpha, long beta, bo
 
     for(auto i = moves.begin();i != moves.end(); i++){
         tempObj = game(GameObj);
-        tempObj.make_move(i->current, i->target, player, false, true);
+        tempObj.make_move(*i, player, false, true);
         val = -negamax(tempObj, reverse_player(player), depth - 1, -beta, -alpha, null_move, use_tt);
         if(val >= beta){
             // Non capture move that causes a beta cutoff = Killer Move
@@ -1122,6 +1150,9 @@ long negamax(game GameObj, string player, short depth, long alpha, long beta, bo
         if(alpha >= beta)
             break;
     }
+    if(alpha == -pow(10, 5)){
+        // TODO(No Moves)
+    }
     short flag=0;
     if(alpha >= beta)
         // Alpha Cutoff
@@ -1133,7 +1164,7 @@ long negamax(game GameObj, string player, short depth, long alpha, long beta, bo
     return alpha;
 }
 
-Move negamax_root(game GameObj, string player, short depth){
+Move negamax_root(game GameObj, string player, short depth, bool use_tt=true){
     // Negamax Root Call
     long best_val = -pow(10, 5);
     long temp_val;
@@ -1143,8 +1174,8 @@ Move negamax_root(game GameObj, string player, short depth){
     game tempObj;
     for(auto temp = moves.begin();temp != moves.end(); temp++){
         tempObj = game(GameObj);
-        tempObj.make_move(temp->current, temp->target, player, false, true);
-        temp_val = -negamax(tempObj, reverse_player(player), depth - 1, -pow(10, 5), -best_val, false);
+        tempObj.make_move(*temp, player, false, true);
+        temp_val = -negamax(tempObj, reverse_player(player), depth - 1, -pow(10, 5), -best_val, false, use_tt);
         if(temp_val > best_val){
             move_pos = *temp;
             best_val = temp_val;

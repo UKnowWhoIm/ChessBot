@@ -73,7 +73,7 @@ class game
         int check_game_over(string);
         short moves_since_last_capture;
         void set_occupied(string, int, bool);
-        bool make_move(short, short, string, bool, bool);
+        bool make_move(Move, string, bool, bool);
         bool is_check(string);
         bool is_capture(short, short, string);
         bool promote_pawn(int, char, string, bool);
