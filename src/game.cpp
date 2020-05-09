@@ -478,7 +478,7 @@ int game::check_game_over(string player){
      Implying the game is either lost or drawn
     */
 
-    vector<Move> moves = this->get_all_moves(player, true);
+    vector<Move> moves = this->get_all_moves(player, false);
 
     if(moves.empty()){
         if(this->is_check(player))
@@ -573,7 +573,7 @@ ChangedAreas implement_move(game &GameObj, Move m, string player){
             /// update target_area
             new_moves = get_valid_moves(GameObj.game_board, i, get_player(GameObj.game_board[i]), GameObj.white_castle, GameObj.black_castle);
             GameObj.target_areas[i] = new_moves;
-            if(get_player(i) == player)
+            if(get_player(GameObj.game_board[i]) == player)
                 changes.player_changed_areas[i] = new_moves;
             else
                 changes.enemy_changed_areas[i] = new_moves;
@@ -613,13 +613,16 @@ ChangedAreas implement_move(game &GameObj, Move m, string player){
 bool check_legality(game GameObj, Move m, string player){
     /// Quickly check for legality
     short king_pos = find_king(GameObj.game_board, player);
+    if(king_pos == -1)
+        /// Player's king is "captured"
+        return false;
     game NewObj = game(GameObj);
     ChangedAreas areas = implement_move(NewObj, m, player);
     for(auto i = areas.enemy_changed_areas.begin(); i != areas.enemy_changed_areas.end(); i++){
         if(test_bit(i->second, king_pos))
-            return true;
+            return false;
     }
-    return false;
+    return true;
 }
 
 vector<Move> game::get_all_moves(string player, bool ai, bool capture_only, short depth){
@@ -1202,7 +1205,7 @@ long quiescence_search(game GameObj, string player, long alpha, long beta, bool 
     vector<Move> captures;
 
     if(!is_check)
-        captures = GameObj.get_all_moves(player, false, true);
+        captures = GameObj.get_all_moves(player, true, true);
     else
         captures = check_evasion(GameObj, player);
 
@@ -1276,7 +1279,7 @@ long negamax(game GameObj, string player, short depth, long alpha, long beta, bo
 
     game tempObj;
     long val;
-    vector<Move> moves = GameObj.get_all_moves(player, false, false, depth);
+    vector<Move> moves = GameObj.get_all_moves(player, true, false, depth);
 
     for(auto i = moves.begin();i != moves.end(); i++){
         tempObj = game(GameObj);
@@ -1318,7 +1321,7 @@ Move negamax_root(game GameObj, string player, short depth, vector<Move> &ordere
     Move node;
     if(ordered_moves.size() == 0){
         pv_move = false;
-        moves = GameObj.get_all_moves(player, false, false, depth);
+        moves = GameObj.get_all_moves(player, true, false, depth);
     }
     else{
         moves.assign(ordered_moves.begin(), ordered_moves.end());

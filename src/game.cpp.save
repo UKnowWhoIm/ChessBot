@@ -474,18 +474,18 @@ int game::check_game_over(string player){
 
     /**
      'moves' contain only legal moves
-     If it is null, then the player has no legal moves
+     If it is empty, then the player has no legal moves
      Implying the game is either lost or drawn
     */
 
-    vector<Move> moves = this->get_all_moves(player, true);
+    vector<Move> moves = this->get_all_moves(player, false);
 
     if(moves.empty()){
         if(this->is_check(player))
             return 1;
         return -1;
     }
-    if(this->moves_since_last_capture >= 50)
+    if(this->moves_since_last_capture >= 100)
         return -1;
     // 'player' has a legal move, implying not a draw or checkmate
     return 0;
@@ -537,7 +537,6 @@ ChangedAreas implement_move(game &GameObj, Move m, string player){
     array<bool, 2> old_castle;
     if(tolower(GameObj.game_board[m.target]) == 'k' && abs(m.current - m.target) != 2){
         /// King has made a non-castle move, so suspend castling rights
-        change_castle = true;
         if(player == WHITE){
             old_castle = GameObj.white_castle;
             GameObj.white_castle = {false, false};
@@ -574,7 +573,7 @@ ChangedAreas implement_move(game &GameObj, Move m, string player){
             /// update target_area
             new_moves = get_valid_moves(GameObj.game_board, i, get_player(GameObj.game_board[i]), GameObj.white_castle, GameObj.black_castle);
             GameObj.target_areas[i] = new_moves;
-            if(get_player(i) == player)
+            if(get_player(GameObj.game_board[i]) == player)
                 changes.player_changed_areas[i] = new_moves;
             else
                 changes.enemy_changed_areas[i] = new_moves;
@@ -614,16 +613,17 @@ ChangedAreas implement_move(game &GameObj, Move m, string player){
 bool check_legality(game GameObj, Move m, string player){
     /// Quickly check for legality
     short king_pos = find_king(GameObj.game_board, player);
+    if(king_pos)
     game NewObj = game(GameObj);
     ChangedAreas areas = implement_move(NewObj, m, player);
     for(auto i = areas.enemy_changed_areas.begin(); i != areas.enemy_changed_areas.end(); i++){
         if(test_bit(i->second, king_pos))
-            return true;
+            return false;
     }
-    return false;
+    return true;
 }
 
-vector<Move> game::get_all_moves(string player, bool legal, bool capture_only, short depth){
+vector<Move> game::get_all_moves(string player, bool ai, bool capture_only, short depth){
     vector<Move> non_captures;
     vector<Move> captures;
     vector<Move> Killers;
@@ -633,9 +633,8 @@ vector<Move> game::get_all_moves(string player, bool legal, bool capture_only, s
         if(get_player(this->game_board[i]) == player){
             temp = get_true_pos(this->get_true_target_area(i, player));
             for(auto j=temp.begin(); j != temp.end(); j++){
-                if(legal)
-                    if(!this->make_move(Move(i, *j), player, true, false))
-                        continue;
+                if(!this->make_move(Move(i, *j), player, true, ai))
+                    continue;
                 if(this->is_capture(i, *j, player)){
                     /// To encourage Low value pieces to capture high value pieces
                     captures.push_back(Move(i, *j, abs(piece_vals(this->game_board[*j])) - abs(piece_vals(this->game_board[i]))));
@@ -1204,7 +1203,7 @@ long quiescence_search(game GameObj, string player, long alpha, long beta, bool 
     vector<Move> captures;
 
     if(!is_check)
-        captures = GameObj.get_all_moves(player, false, true);
+        captures = GameObj.get_all_moves(player, true, true);
     else
         captures = check_evasion(GameObj, player);
 
@@ -1278,7 +1277,7 @@ long negamax(game GameObj, string player, short depth, long alpha, long beta, bo
 
     game tempObj;
     long val;
-    vector<Move> moves = GameObj.get_all_moves(player, false, false, depth);
+    vector<Move> moves = GameObj.get_all_moves(player, true, false, depth);
 
     for(auto i = moves.begin();i != moves.end(); i++){
         tempObj = game(GameObj);
@@ -1320,7 +1319,7 @@ Move negamax_root(game GameObj, string player, short depth, vector<Move> &ordere
     Move node;
     if(ordered_moves.size() == 0){
         pv_move = false;
-        moves = GameObj.get_all_moves(player, false, false, depth);
+        moves = GameObj.get_all_moves(player, true, false, depth);
     }
     else{
         moves.assign(ordered_moves.begin(), ordered_moves.end());

@@ -107,6 +107,7 @@ void initialize_prn(bool=false);
 Move call_ai(game, string, short);
 
 // For debugging purposes only, Delete in production
+bool check_legality(game, Move, string);
 long heuristic(game, string, string);
 bitset<64> get_valid_moves(string, int, string);
 vector<int> get_true_pos(bitset<64>);

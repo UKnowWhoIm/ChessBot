@@ -55,16 +55,11 @@ int main()
     Move a;
     int target, current;
     bool status;
-    bool ai_only = true;
+    bool ai_only = false;
     bool play_game = false;
     bool multiplayer = false;
     GameObj.initial_zobrist_hash(player);
-
-    vector<Move> moves = GameObj.get_all_moves(WHITE, false);
-    
-    
-    GameObj.get_all_moves(player, true);
-
+    vecto
     while(!GameObj.game_over && play_game){
         disp_board(GameObj.game_board);
         cout<<"\n"<<player<<"\'s Turn";

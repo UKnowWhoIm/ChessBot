@@ -56,11 +56,14 @@ int main()
     int target, current;
     bool status;
     bool ai_only = true;
-    bool play_game = false;
+    bool play_game = true;
     bool multiplayer = false;
     GameObj.initial_zobrist_hash(player);
+    /*
+    vector <Move> moves = GameObj.get_all_moves(BLACK, true);
+    for(auto i = moves.begin(); i != moves.end(); i++)
+        cout<<i->current<<' '<<i->target<<endl;*/
 
-    vector<Move> moves = GameObj.get_all_moves(WHITE, false);
 
     while(!GameObj.game_over && play_game){
         disp_board(GameObj.game_board);
@@ -77,7 +80,7 @@ int main()
         }
         else{
             auto start = std::chrono::high_resolution_clock::now();
-            a = call_ai(GameObj, player, 6);
+            a = call_ai(GameObj, player, 5);
             auto stop = std::chrono::high_resolution_clock::now();
             auto duration = std::chrono::duration_cast<std::chrono::milliseconds>(stop - start);
             cout<<'\n'<<a.current<<' '<<a.target<<' '<<duration.count()<<endl;

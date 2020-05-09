@@ -33,8 +33,10 @@ struct Move{
         this->target = t;
         this->score = s;
     }
-    Move operator == (const Move &obj){
-        if(this->current == obj.current && this->target == obj.ta)
+    bool operator == (const Move &obj){
+        if(this->current == obj.current && this->target == obj.target)
+            return true;
+        return false;
     }
 };
 
@@ -67,11 +69,11 @@ class game
         bitset<64> get_true_target_area(string);
         bitset<64> get_pseudo_target_area(int);
         bitset<64> get_pseudo_target_area(string);
-        vector<Move> get_all_moves(string, bool, bool=false);
+        vector<Move> get_all_moves(string, bool, bool=false, short=-1);
         int check_game_over(string);
         short moves_since_last_capture;
         void set_occupied(string, int, bool);
-        bool make_move(short, short, string, bool, bool);
+        bool make_move(Move, string, bool, bool);
         bool is_check(string);
         bool is_capture(short, short, string);
         bool promote_pawn(int, char, string, bool);
@@ -105,6 +107,8 @@ void initialize_prn(bool=false);
 Move call_ai(game, string, short);
 
 // For debugging purposes only, Delete in production
+ChangedAreas check_legality(game, M, string);
+long heuristic(game, string, string);
 bitset<64> get_valid_moves(string, int, string);
 vector<int> get_true_pos(bitset<64>);
 string reverse_player(string);
