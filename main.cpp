@@ -56,7 +56,7 @@ int main()
     int target, current;
     bool status;
     bool ai_only = true;
-    bool play_game = true;
+    bool play_game = false;
     bool multiplayer = false;
     GameObj.initial_zobrist_hash(player);
 

@@ -521,6 +521,108 @@ bool is_killer(short depth, Move m){
     return false;
 }
 
+struct ChangedAreas{
+    unordered_map <short, bitset<64>> enemy_changed_areas;
+    unordered_map <short, bitset<64>> player_changed_areas;
+};
+
+ChangedAreas implement_move(game &GameObj, Move m, string player){
+    bitset<64> move_board(0);
+    set_bit(move_board, m.current);
+    set_bit(move_board, m.target);
+    char old_piece = GameObj.game_board[m.target];
+    GameObj.game_board[m.target] = GameObj.game_board[m.current];
+    GameObj.game_board[m.current] = 'f';
+    char en_passant_piece;
+    array<bool, 2> old_castle;
+    if(tolower(GameObj.game_board[m.target]) == 'k' && abs(m.current - m.target) != 2){
+        /// King has made a non-castle move, so suspend castling rights
+        change_castle = true;
+        if(player == WHITE){
+            old_castle = GameObj.white_castle;
+            GameObj.white_castle = {false, false};
+        }
+        else{
+            old_castle = GameObj.black_castle;
+            GameObj.black_castle = {false, false};
+        }
+    }
+    bool is_en_passant = false;
+    short en_passant_pos;
+    GameObj.set_occupied(player, m.target, 1);
+    GameObj.set_occupied(player, m.current, 0);
+    /// Essential For Captures
+    GameObj.set_occupied(reverse_player(player), m.target, 0);
+    array <bitset<64>, 64> old_target_area;
+    bitset<64> new_moves;
+    ChangedAreas changes;
+    old_target_area = GameObj.target_areas;
+    bool last_rank = (m.target < 64 && m.target > 55 && player == BLACK) || (m.target < 8 && m.target >= 0 && player == WHITE);
+
+    if(tolower(GameObj.game_board[m.target]) == 'p' && last_rank)
+        GameObj.target_areas[m.target] = 0;
+    else{
+        new_moves = get_valid_moves(GameObj.game_board, m.target, player, GameObj.white_castle, GameObj.black_castle);
+        GameObj.target_areas[m.target] = new_moves;
+        changes.player_changed_areas[m.target] = new_moves;
+    }
+
+    GameObj.target_areas[m.current] = 0;
+
+    for(int i = 0; i < 64; i++)
+        if((GameObj.target_areas[i] & move_board).any()){
+            /// update target_area
+            new_moves = get_valid_moves(GameObj.game_board, i, get_player(GameObj.game_board[i]), GameObj.white_castle, GameObj.black_castle);
+            GameObj.target_areas[i] = new_moves;
+            if(get_player(i) == player)
+                changes.player_changed_areas[i] = new_moves;
+            else
+                changes.enemy_changed_areas[i] = new_moves;
+        }
+
+    /// Implementing En Passant
+    if(GameObj.en_passant == m.target && tolower(GameObj.game_board[m.target]) == 'p' && old_piece == 'f'){
+        is_en_passant = true;
+        short dirn = 1;
+        if(player == WHITE)
+            dirn = -1;
+        short enemy_pos = m.target - dirn*8;
+        en_passant_piece = GameObj.game_board[enemy_pos];
+        en_passant_pos = enemy_pos;
+        GameObj.game_board[enemy_pos] = 'f';
+        GameObj.set_occupied(reverse_player(player), enemy_pos, 0);
+        GameObj.target_areas[enemy_pos] = 0;
+    }
+
+    if(old_piece != 'f')
+        GameObj.moves_since_last_capture += 1;
+    else
+        GameObj.moves_since_last_capture = 0;
+
+    if(is_en_passant){
+        /// Remove en_passant piece from zobrist value
+        GameObj.zobrist_val ^= PRN[GameObj.TT_INDEXES[en_passant_piece] + en_passant_pos];
+    }
+    if(GameObj.en_passant != -1){
+        /// Remove en passant file from zobrist value if it was set
+        GameObj.zobrist_val ^= PRN[GameObj.tt_en_passant_start + GameObj.en_passant % 8];
+    }
+
+    return changes;
+}
+
+bool check_legality(game GameObj, Move m, string player){
+    /// Quickly check for legality
+    short king_pos = find_king(GameObj.game_board, player);
+    game NewObj = game(GameObj);
+    ChangedAreas areas = implement_move(NewObj, m, player);
+    for(auto i = areas.enemy_changed_areas.begin(); i != areas.enemy_changed_areas.end(); i++){
+        if(test_bit(i->second, king_pos))
+            return true;
+    }
+    return false;
+}
+
 vector<Move> game::get_all_moves(string player, bool legal, bool capture_only, short depth){
     vector<Move> non_captures;
     vector<Move> captures;
@@ -567,108 +669,15 @@ bool game::make_move(Move m, string player, bool _reverse, bool ai){
         if(!test_bit(this->get_true_target_area(m.current, player), m.target))
             return false;
     }
-
-    bitset<64> move_board(0);
-    set_bit(move_board, m.current);
-    set_bit(move_board, m.target);
-    // These are the steps that should be reversed to restore game to previous state
-    char old_piece = this->game_board[m.target];
-    this->game_board[m.target] = this->game_board[m.current];
-    this->game_board[m.current] = 'f';
-    char en_passant_piece;
-    array<bool, 2> old_castle;
-    bool change_castle = false;
-    if(tolower(this->game_board[m.target]) == 'k' && abs(m.current - m.target) != 2){
-        /// King has made a non-castle move, so suspend castling rights
-        change_castle = true;
-        if(player == WHITE){
-            old_castle = this->white_castle;
-            this->white_castle = {false, false};
-        }
-        else{
-            old_castle = this->black_castle;
-            this->black_castle = {false, false};
-        }
+    char old_piece = this->game_board[m.current];
+    if(check_legality(*this, m, player)){
+        if(_reverse)
+            return true;
+        implement_move(*this, m, player);
     }
-    bool is_en_passant = false;
-    short en_passant_pos;
-    this->set_occupied(player, m.target, 1);
-    this->set_occupied(player, m.current, 0);
-    // Essential For Captures
-    this->set_occupied(reverse_player(player), m.target, 0);
-    array <bitset<64>, 64> old_target_area;
-    old_target_area = this->target_areas;
-    bool last_rank = (m.target < 64 && m.target > 55 && player == BLACK) || (m.target < 8 && m.target >= 0 && player == WHITE);
-    if(tolower(this->game_board[m.target]) == 'p' && last_rank)
-        this->target_areas[m.target] = 0;
     else
-        this->target_areas[m.target] = get_valid_moves(this->game_board, m.target, player, this->white_castle, this->black_castle);
-    this->target_areas[m.current] = 0;
+        return false;
 
-    for(int i = 0; i < 64; i++)
-        if((this->target_areas[i] & move_board).any())
-            //update target_area
-            this->target_areas[i] = get_valid_moves(this->game_board, i, get_player(this->game_board[i]), this->white_castle, this->black_castle);
-
-    // Implementing En Passant
-    if(this->en_passant == m.target && tolower(this->game_board[m.target]) == 'p' && old_piece == 'f'){
-        is_en_passant = true;
-        short dirn = 1;
-        if(player == WHITE)
-            dirn = -1;
-        short enemy_pos = m.target - dirn*8;
-        en_passant_piece = this->game_board[enemy_pos];
-        en_passant_pos = enemy_pos;
-        this->game_board[enemy_pos] = 'f';
-        this->set_occupied(reverse_player(player), enemy_pos, 0);
-        this->target_areas[enemy_pos] = 0;
-    }
-    if(ai && _reverse)
-        ai = false;
-    bool checked_;
-    if (!ai)
-        checked_ = this->is_check(player);
-    else
-        checked_ = false;
-    if(_reverse || checked_){
-        this -> target_areas = old_target_area;
-        this -> game_board[m.current] = this->game_board[m.target];
-        this -> game_board[m.target] = old_piece;
-        this -> set_occupied(player, m.current, 1);
-        this -> set_occupied(player, m.target, 0);
-
-        // reversing capture
-        if(old_piece != 'f')
-            this -> set_occupied(reverse_player(player), m.target, 1);
-        // reversing en passant
-        if(is_en_passant){
-            this->game_board[en_passant_pos] = en_passant_piece;
-            this->set_occupied(reverse_player(player), en_passant_pos, 1);
-        }
-        // reversing castling rights
-        if(change_castle){
-            if(player == WHITE)
-                this->white_castle = old_castle;
-            else
-                this->black_castle = old_castle;
-        }
-        return !checked_;
-    }
-    if(old_piece != 'f')
-        this->moves_since_last_capture += 1;
-    else
-        this->moves_since_last_capture = 0;
-
-    if(is_en_passant){
-        // Remove en_passant piece from zobrist value
-        this->zobrist_val ^= PRN[this->TT_INDEXES[en_passant_piece] + en_passant_pos];
-        //cout<<this->TT_INDEXES[en_passant_piece] + en_passant_pos<<" Removal of en Passant Piece\n";
-    }
-    if(this->en_passant != -1){
-        // Remove en passant file from zobrist value if it was set
-        this->zobrist_val ^= PRN[this->tt_en_passant_start + this->en_passant % 8];
-        //cout<<this->tt_en_passant_start + this->en_passant % 8<<" Removal of previous en Passant\n";
-    }
     if(tolower(this->game_board[m.target]) == 'r'){
         int left, right;
         if(player == WHITE){
@@ -679,7 +688,7 @@ bool game::make_move(Move m, string player, bool _reverse, bool ai){
             left = 0;
             right = 7;
         }
-        // For TT Castle Ref see line 40
+        /// For TT Castle Ref see line 40
         if(m.current == left){
             if(player == WHITE && this->white_castle[0]){
                 this->white_castle[0] = false;
@@ -773,6 +782,7 @@ bool game::make_move(Move m, string player, bool _reverse, bool ai){
             dirn = -1;
             ai_piece = 'Q';
         }
+        bool last_rank = (m.target < 64 && m.target > 55 && player == BLACK) || (m.target < 8 && m.target >= 0 && player == WHITE);
 
         if(last_rank){
             if(!ai)
@@ -801,12 +811,9 @@ bool game::make_move(Move m, string player, bool _reverse, bool ai){
     else
         this->en_passant = -1;
 
-    if(!ai){
-        update_status(player);
-        this->checked = this->is_check(reverse_player(player));
-    }
+    this->checked = this->is_check(reverse_player(player));
 
-    // Update position in zobrist(placed here to avoid cases of pawn promotion)
+    /// Update position in zobrist(placed here to avoid cases of pawn promotion)
     this->update_zobrist_val(m.current, m.target, this->game_board[m.target], old_piece);
 
     // Switch Player in zobrist
@@ -1340,7 +1347,7 @@ Move negamax_root(game GameObj, string player, short depth, vector<Move> &ordere
         node = Move(temp->current, temp->target, temp_val);
         ordered_moves.push_back(node);
         if(temp_val > best_val){
-            best_move = *temp;
+            best_move = node;
             best_val = temp_val;
         }
         pv_move = false;
