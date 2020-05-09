@@ -78,9 +78,11 @@ class game
         bool is_capture(short, short, string);
         bool promote_pawn(int, char, string, bool);
         void update_status(string);
+        void set_check(string,  unordered_map<short, bitset<64>>);
         int en_passant;
         bool game_over;
         bool checked;
+        vector<short> checked_pieces;
         array<bool, 2> white_castle;
         array<bool, 2> black_castle;
         string winner;

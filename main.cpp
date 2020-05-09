@@ -17,13 +17,17 @@ short convert_to_pos(char notation[3]){
 void process_move_file(game &GameObj){
     ifstream move_file(file_name);
     short current, target;
+    long score;
     string player;
+    cout<<"AA";
     while(!move_file.eof()){
         move_file >> player;
         move_file >> current;
         move_file >> target;
+        move_file >> score;
         GameObj.make_move(Move(current, target), player, false, true);
     }
+
     move_file.close();
 }
 
@@ -56,7 +60,7 @@ int main()
     int target, current;
     bool status;
     bool ai_only = true;
-    bool play_game = true;
+    bool play_game = false;
     bool multiplayer = false;
     GameObj.initial_zobrist_hash(player);
     /*
@@ -64,6 +68,12 @@ int main()
     for(auto i = moves.begin(); i != moves.end(); i++)
         cout<<i->current<<' '<<i->target<<endl;*/
 
+    process_move_file(GameObj);
+    disp_board(GameObj.game_board);
+    vector<Move> moves = GameObj.get_all_moves(WHITE, true);
+    for(auto i = moves.begin(); i != moves.end(); i++){
+        cout<<endl<<i->current<<' '<<i->target;
+    }
 
     while(!GameObj.game_over && play_game){
         disp_board(GameObj.game_board);

@@ -422,6 +422,18 @@ bool game::is_check(string player){
     return test_bit(this->get_true_target_area(reverse_player(player)), king_pos);
 }
 
+void game::set_check(string player, unordered_map<short, bitset<64>> enemy_areas){
+    short king_pos = find_king(this->game_board, player);
+    if(king_pos == -1)
+        return;
+    for(auto itr = enemy_areas.begin(); itr != enemy_areas.end(); itr++)
+        if(test_bit(itr->second, king_pos)){
+            this->checked = true;
+            this->checked_pieces.push_back(itr->first);
+        }
+}
+
+
 void game::update_status(string player){
     // Check For CheckMate Or Draw
     int status = this->check_game_over(reverse_player(player));
@@ -616,6 +628,8 @@ bool check_legality(game GameObj, Move m, string player){
     if(king_pos == -1)
         /// Player's king is "captured"
         return false;
+    if(king_pos == m.current)
+        return !test_bit(GameObj.get_true_target_area(reverse_player(player)), king_pos);
     game NewObj = game(GameObj);
     ChangedAreas areas = implement_move(NewObj, m, player);
     for(auto i = areas.enemy_changed_areas.begin(); i != areas.enemy_changed_areas.end(); i++){
@@ -671,10 +685,11 @@ bool game::make_move(Move m, string player, bool _reverse, bool ai){
             return false;
     }
     char old_piece = this->game_board[m.current];
+    ChangedAreas changes;
     if(check_legality(*this, m, player)){
         if(_reverse)
             return true;
-        implement_move(*this, m, player);
+        changes = implement_move(*this, m, player);
     }
     else
         return false;
@@ -812,7 +827,8 @@ bool game::make_move(Move m, string player, bool _reverse, bool ai){
     else
         this->en_passant = -1;
 
-    this->checked = this->is_check(reverse_player(player));
+    this->checked_pieces.clear();
+    this->set_check(reverse_player(player), changes.enemy_changed_areas);
 
     /// Update position in zobrist(placed here to avoid cases of pawn promotion)
     this->update_zobrist_val(m.current, m.target, this->game_board[m.target], old_piece);
@@ -907,25 +923,25 @@ void game::initial_zobrist_hash(string player){
 
     this->zobrist_val = 0;
 
-    // PRN[0] for player == Black
+    /// PRN[0] for player == Black
 
     if(player == BLACK)
         this->zobrist_val ^= PRN[0];
 
-    // Next 10*64 + 2*56 indexes for position of pieces
+    /// Next 10*64 + 2*56 indexes for position of pieces
 
     for(int i = 0; i < 64; i++)
         if(this->game_board[i] != 'f')
             this->zobrist_val^= PRN[this->TT_INDEXES.at(this->game_board[i]) + i];
 
-    // Next 8 indexes for Castling
+    /// Next 8 indexes for Castling
 
     this->zobrist_val ^= PRN[this->tt_castle_start_index + (short)white_castle[0]];
     this->zobrist_val ^= PRN[this->tt_castle_start_index + 2 +(short)white_castle[1]];
     this->zobrist_val ^= PRN[this->tt_castle_start_index + 4 +(short)black_castle[0]];
     this->zobrist_val ^= PRN[this->tt_castle_start_index + 6 +(short)black_castle[1]];
 
-    // Next 8 indexes for enpassant file if any
+    /// Next 8 indexes for enpassant file if any
 
     if(this->en_passant != -1){
         this->zobrist_val ^= PRN[this->tt_en_passant_start + this->en_passant % 8];
@@ -1374,7 +1390,7 @@ Move call_ai(game GameObj, string player, short depth){
 
     const short shallow_depth = 3;
 
-    const bool use_tt = true;
+    const bool use_tt = false;
 
     long best_val;
 
