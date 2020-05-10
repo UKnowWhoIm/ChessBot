@@ -28,13 +28,18 @@ struct Move{
         this->current = c;
         this->target = t;
     }
-    Move(short c, short t, int s){
+    Move(short c, short t, long s){
         this->current = c;
         this->target = t;
         this->score = s;
     }
     bool operator == (const Move &obj){
         if(this->current == obj.current && this->target == obj.target)
+            return true;
+        return false;
+    }
+    bool operator != (const Move &obj){
+        if(this->current != obj.current && this->target != obj.target)
             return true;
         return false;
     }
@@ -61,15 +66,15 @@ class game
     public:
         game();
         game(const game&);
-        //game(char[65])
         virtual ~game();
         bitset<64> get_occupied(string);
         bitset<64> get_occupied();
         bitset<64> get_true_target_area(int, string);
         bitset<64> get_true_target_area(string);
-        bitset<64> get_pseudo_target_area(int);
-        bitset<64> get_pseudo_target_area(string);
+        bitset<64> get_protected_area(int);
+        bitset<64> get_protected_area(string);
         vector<Move> get_all_moves(string, bool, bool=false, short=-1);
+        vector<Move> check_move_generator(string);
         int check_game_over(string);
         short moves_since_last_capture;
         void set_occupied(string, int, bool);
@@ -78,9 +83,11 @@ class game
         bool is_capture(short, short, string);
         bool promote_pawn(int, char, string, bool);
         void update_status(string);
+        void set_check(string,  unordered_map<short, bitset<64>>);
         int en_passant;
         bool game_over;
         bool checked;
+        vector<short> checked_pieces;
         array<bool, 2> white_castle;
         array<bool, 2> black_castle;
         string winner;
@@ -107,7 +114,7 @@ void initialize_prn(bool=false);
 Move call_ai(game, string, short);
 
 // For debugging purposes only, Delete in production
-ChangedAreas check_legality(game, M, string);
+bool check_legality(game, Move, string);
 long heuristic(game, string, string);
 bitset<64> get_valid_moves(string, int, string);
 vector<int> get_true_pos(bitset<64>);

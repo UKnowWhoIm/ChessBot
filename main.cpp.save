@@ -14,26 +14,49 @@ short convert_to_pos(char notation[3]){
     return pos;
 }
 
+long compute_average(){
+    ifstream move_file(file_name);
+    short current, target;
+    long time;
+    long total_time=0;
+    short moves=0;
+    Move previous;
+    string player;
+    while(!move_file.eof()){
+        moves++;
+        move_file >> player;
+        move_file >> current;
+        move_file >> target;
+        move_file >> time;
+        if(previous != Move(current, target))
+            total_time += time;
+        previous = Move(current, target);
+    }
+    move_file.close();
+    return total_time/moves;
+}
+
 void process_move_file(game &GameObj){
     ifstream move_file(file_name);
     short current, target;
-    long score;
+    long time;
+    Move previous;
     string player;
-    cout<<"AA";
     while(!move_file.eof()){
         move_file >> player;
         move_file >> current;
         move_file >> target;
-        move_file >> score;
-        GameObj.make_move(Move(current, target), player, false, true);
+        move_file >> time;
+        if(previous != Move(current, target))
+            GameObj.make_move(Move(current, target), player, false, true);
+        previous = Move(current, target);
     }
-
     move_file.close();
 }
 
-void dump_move(string player, Move m){
+void dump_move(string player, Move m, long duration){
     ofstream move_file(file_name, ios::app);
-    move_file << player << ' ' << m.current << ' ' << m.target << ' ' << m.score << '\n';
+    move_file << player << ' ' << m.current << ' ' << m.target << ' ' << duration << '\n';
 }
 
 void get_status(game GameObj, string player){
@@ -54,27 +77,18 @@ int main()
     game GameObj;
     string player = WHITE;
     const string human = WHITE;
-    const string ai_player = BLACK;
+    const string ai_player = WHITE;
     char notation_target[3], notation_current[3];
     Move a;
     int target, current;
     bool status;
-    bool ai_only = true;
-    bool play_game = false;
-    bool multiplayer = false;
+    bool ai_only = false;
+    bool play_game = true;
+    bool multiplayer = true;
     GameObj.initial_zobrist_hash(player);
-    /*
-    vector <Move> moves = GameObj.get_all_moves(BLACK, true);
-    for(auto i = moves.begin(); i != moves.end(); i++)
-        cout<<i->current<<' '<<i->target<<endl;*/
-
-    process_move_file(GameObj);
-    disp_board(GameObj.game_board);
-    vector<Move> moves = GameObj.get_all_moves(BLACK, true);
-    for(auto i = moves.begin(); i != moves.end(); i++){
-        cout<<i->current<<' '<<i->target<<;
-    }
-
+    //process_move_file(GameObj);
+    GameObj.make_move(Move(4, 31), BLACK, false, true);
+    GameObj.make_move()
     while(!GameObj.game_over && play_game){
         disp_board(GameObj.game_board);
         cout<<"\n"<<player<<"\'s Turn";
@@ -95,7 +109,7 @@ int main()
             auto duration = std::chrono::duration_cast<std::chrono::milliseconds>(stop - start);
             cout<<'\n'<<a.current<<' '<<a.target<<' '<<duration.count()<<endl;
 
-            dump_move(player, a);
+            dump_move(player, a, duration.count());
             if(a == Move(-1, -1)){
                 // no moves
                 cout << "Stopped Because "<<player<<" returned -1,-1 as move";
@@ -114,11 +128,18 @@ int main()
                 }
 
             }
+            GameObj.update_status(player);
+
             player = reverse_player(player);
         }
         else
             cout<<"\n\nERROR\n\n";
     }
+    cout<<endl<<endl;
+    if(GameObj.winner == "")
+        cout<<"Drawn";
+    else
+        cout<<GameObj.winner<<" Has Won";
 /*
 */
     return 0;

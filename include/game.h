@@ -28,13 +28,18 @@ struct Move{
         this->current = c;
         this->target = t;
     }
-    Move(short c, short t, int s){
+    Move(short c, short t, long s){
         this->current = c;
         this->target = t;
         this->score = s;
     }
     bool operator == (const Move &obj){
         if(this->current == obj.current && this->target == obj.target)
+            return true;
+        return false;
+    }
+    bool operator != (const Move &obj){
+        if(this->current != obj.current && this->target != obj.target)
             return true;
         return false;
     }
@@ -61,15 +66,15 @@ class game
     public:
         game();
         game(const game&);
-        //game(char[65])
         virtual ~game();
         bitset<64> get_occupied(string);
         bitset<64> get_occupied();
         bitset<64> get_true_target_area(int, string);
         bitset<64> get_true_target_area(string);
-        bitset<64> get_pseudo_target_area(int);
-        bitset<64> get_pseudo_target_area(string);
+        bitset<64> get_protected_area(int);
+        bitset<64> get_protected_area(string);
         vector<Move> get_all_moves(string, bool, bool=false, short=-1);
+        vector<Move> check_move_generator(string);
         int check_game_over(string);
         short moves_since_last_capture;
         void set_occupied(string, int, bool);
