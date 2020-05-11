@@ -960,7 +960,7 @@ class HashEntry{
     short depth;
     unsigned long long zobrist;
     long score;
-    short type; /// 1 -> beta cutoff(>=score) , 0 -> exact evaluation(=score), -1 -> alpha cutoff(<=score)
+    short type; /// 1 -> beta cutoff(>=score) , 0 -> exact evaluation(=score)
     HashEntry(short _depth, unsigned long long _zobrist, short _type, long _score){
         this->depth = _depth;
         this->zobrist = _zobrist;
@@ -988,10 +988,7 @@ class HashEntry{
         if(this->type == 0)
             /// Old hash has exact value
             return false;
-        if(this->type == new_hash.type && this->type == -1){
-            /// Both have alpha cutoffs, store the 1 with higher cutoff
-            return (this->score > new_hash.score);
-        }
+
         if(this->type == new_hash.type && this->type == 1){
             /// Both have beta cutoffs, store the 1 with lower cutoff
             return (this->score < new_hash.score);
@@ -1206,18 +1203,6 @@ void insert_killer(Move m, short depth){
     KillerMoves[depth][KillerSize - 1] = m;
 }
 
-vector<Move> get_legal_evasions(game GameObj, short target, string player, vector<Move>& moves){
-    long enemy_piece_val = abs(piece_vals(GameObj.game_board[target]));
-        for(short i=0; i < 64; i++){
-            if(get_player(GameObj.game_board[i]) == player)
-                if(test_bit(GameObj.get_true_target_area(i, player), target)){
-                    if(GameObj.make_move(Move(i, target), player, true, true))
-                        moves.push_back( Move(i, target, enemy_piece_val - abs(piece_vals(GameObj.game_board[i]))));
-                }
-        }
-    return moves;
-}
-
 const short R = 2;
 
 const short max_q_depth = 4;
@@ -1238,12 +1223,6 @@ long quiescence_search(game GameObj, string player, long alpha, long beta, bool 
             if(this_state.score >= beta)
                 return this_state.score;
             beta = this_state.score;
-        }
-        else if(this_state.type == -1){
-            // Alpha cutoff
-            if(this_state.score <= alpha)
-                return this_state.score;
-            alpha = this_state.score;
         }
 
     }
@@ -1277,18 +1256,11 @@ long quiescence_search(game GameObj, string player, long alpha, long beta, bool 
         tempObj.make_move(*i, player, false, true);
         val = -quiescence_search(tempObj, reverse_player(player), -beta, -alpha, use_tt, depth - 1);
         if(val >= beta){
-            this_state = HashEntry(0, GameObj.zobrist_val, 1, alpha);
-            if(trans_tables[this_state.zobrist % HashSize].replace_hash(this_state))
-                trans_tables[this_state.zobrist % HashSize] = this_state;
             return beta;
         }
         alpha = val > alpha ? val : alpha;
     }
-    /*
-    this_state = HashEntry(0, GameObj.zobrist_val, 0, alpha);
-    if(trans_tables[this_state.zobrist % HashSize].replace_hash(this_state))
-        trans_tables[this_state.zobrist % HashSize] = this_state;
-        */
+
     return alpha;
 
 }
@@ -1320,6 +1292,7 @@ long negamax(game GameObj, string player, short depth, long alpha, long beta, bo
                 beta = this_state.score;
             }
             else if(this_state.type == -1){
+                cout<<"HOWWWWWWWWWWWWWWWWWW?????????\n";
                 // Alpha cutoff
                 if(this_state.score <= alpha)
                     return this_state.score;
@@ -1358,18 +1331,12 @@ long negamax(game GameObj, string player, short depth, long alpha, long beta, bo
             return beta;
         }
         alpha = val > alpha ? val : alpha;
-        if(alpha >= beta)
-            break;
     }
     if(alpha == -pow(10, 5)){
         // TODO(No Moves)
     }
-    short flag=0;
-    if(alpha >= beta)
-        // Alpha Cutoff
-        flag = -1;
 
-    this_state = HashEntry(depth, GameObj.zobrist_val, flag, alpha);
+    this_state = HashEntry(depth, GameObj.zobrist_val, 0, alpha);
     if(trans_tables[this_state.zobrist % HashSize].replace_hash(this_state))
         trans_tables[this_state.zobrist % HashSize] = this_state;
     return alpha;
@@ -1436,7 +1403,7 @@ Move call_ai(game GameObj, string player, short depth){
 
     const short shallow_depth = 3;
 
-    const bool use_tt = false;
+    const bool use_tt = true;
 
     long best_val;
 

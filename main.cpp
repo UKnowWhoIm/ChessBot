@@ -73,7 +73,7 @@ void get_status(game GameObj, string player){
 int main()
 {
     /// Initialize PRN
-    initialize_prn(true);
+    initialize_prn();
     game GameObj;
     string player = WHITE;
     const string human = WHITE;
@@ -102,12 +102,14 @@ int main()
         }
         else{
             auto start = std::chrono::high_resolution_clock::now();
-            a = call_ai(GameObj, player, 5);
+            a = call_ai(GameObj, player, 6);
             auto stop = std::chrono::high_resolution_clock::now();
             auto duration = std::chrono::duration_cast<std::chrono::milliseconds>(stop - start);
             cout<<'\n'<<a.current<<' '<<a.target<<' '<<duration.count()<<endl;
-
+            /**
+            MOVE LOGGING
             dump_move(player, a, duration.count());
+            */
             if(a == Move(-1, -1)){
                 // no moves
                 cout << "Stopped Because "<<player<<" returned -1,-1 as move";
