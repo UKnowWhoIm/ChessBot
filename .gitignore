@@ -2,3 +2,5 @@
 *.depend
 bin/
 obj/
+debug.txt
+moves.txt
