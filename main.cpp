@@ -102,7 +102,7 @@ int main()
         }
         else{
             auto start = std::chrono::high_resolution_clock::now();
-            a = call_ai(GameObj, player, 6);
+            a = call_ai(GameObj, player, 5);
             auto stop = std::chrono::high_resolution_clock::now();
             auto duration = std::chrono::duration_cast<std::chrono::milliseconds>(stop - start);
             cout<<'\n'<<a.current<<' '<<a.target<<' '<<duration.count()<<endl;
@@ -118,6 +118,7 @@ int main()
             status = GameObj.make_move(a, player, false, true);
         }
         if(status){
+            cout<<endl<<"Zobrist "<<GameObj.zobrist_val<<endl;
             if(GameObj.pawn_promotion != -1){
                 char piece;
                 bool result = false;
@@ -128,7 +129,7 @@ int main()
                 }
 
             }
-            GameObj.update_status(player);
+            //GameObj.update_status(player);
 
             player = reverse_player(player);
         }

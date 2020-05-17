@@ -16,33 +16,35 @@ using namespace std;
 const string WHITE = "white";
 const string BLACK = "black";
 
-struct Move{
-    short current;
-    short target;
-    int score;
-    Move *next;
-    Move(){
-        this->next = nullptr;
-    }
-    Move(int c, int t){
-        this->current = c;
-        this->target = t;
-    }
-    Move(short c, short t, long s){
-        this->current = c;
-        this->target = t;
-        this->score = s;
-    }
-    bool operator == (const Move &obj){
-        if(this->current == obj.current && this->target == obj.target)
-            return true;
-        return false;
-    }
-    bool operator != (const Move &obj){
-        if(this->current != obj.current && this->target != obj.target)
-            return true;
-        return false;
-    }
+class Move{
+    public:
+        short current;
+        short target;
+        int score;
+        Move *next;
+        friend ostream& operator<<(ostream& out, const Move & m);
+        Move(){
+            this->next = nullptr;
+        }
+        Move(int c, int t){
+            this->current = c;
+            this->target = t;
+        }
+        Move(short c, short t, long s){
+            this->current = c;
+            this->target = t;
+            this->score = s;
+        }
+        bool operator == (const Move &obj){
+            if(this->current == obj.current && this->target == obj.target)
+                return true;
+            return false;
+        }
+        bool operator != (const Move &obj){
+            if(this->current != obj.current && this->target != obj.target)
+                return true;
+            return false;
+        }
 };
 
 class game

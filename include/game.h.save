@@ -21,6 +21,7 @@ struct Move{
     short target;
     int score;
     Move *next;
+    
     Move(){
         this->next = nullptr;
     }

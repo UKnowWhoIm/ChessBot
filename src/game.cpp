@@ -54,6 +54,11 @@ TT CASTLE REF:
 
 */
 
+ostream & operator << (ostream & out, const Move & m){
+    out << m.current << ' ' << m.target << endl;
+    return out;
+}
+
 long piece_vals(char piece){
     switch(piece){
         case 'p':return 50;
@@ -444,6 +449,10 @@ bool game::promote_pawn(int current, char piece, string player, bool ai=false){
         // AI CALL
         this->game_board[current] = piece;
         this->target_areas[current] = get_valid_moves(this->game_board, current, player, this->white_castle, this->black_castle);
+        this->zobrist_val ^= PRN[this->TT_INDEXES[piece] + current];
+        //cout<<"Added New Piece From Promotion @ "<<current<<endl;
+        this->zobrist_val ^= PRN[0];
+        //cout<<"Switch Player @ PP\n";
         return true;
     }
     if(this->pawn_promotion == current){
@@ -457,6 +466,10 @@ bool game::promote_pawn(int current, char piece, string player, bool ai=false){
             this->target_areas[current] = get_valid_moves(this->game_board, current, player, this->white_castle, this->black_castle);
             this->update_status(player);
             this->checked = this->is_check(player);
+            this->zobrist_val ^= PRN[this->TT_INDEXES[piece] + current];
+            //cout<<"Added New Piece From Promotion @ "<<current<<endl;
+            this->zobrist_val ^= PRN[0];
+            //cout<<"Switch Player @ PP\n";
             return true;
         }
     }
@@ -610,12 +623,13 @@ ChangedAreas implement_move(game &GameObj, Move m, string player){
     if(is_en_passant){
         /// Remove en_passant piece from zobrist value
         GameObj.zobrist_val ^= PRN[GameObj.TT_INDEXES[en_passant_piece] + en_passant_pos];
+        //cout<<"Remove en passant piece as it is captured from "<<en_passant_pos<<endl;
     }
     if(GameObj.en_passant != -1){
         /// Remove en passant file from zobrist value if it was set
         GameObj.zobrist_val ^= PRN[GameObj.tt_en_passant_start + GameObj.en_passant % 8];
+        //cout<<"Remove en passant file due to inaction "<<GameObj.en_passant % 8<<endl;
     }
-
     return changes;
 }
 
@@ -683,7 +697,7 @@ bool game::make_move(Move m, string player, bool _reverse, bool ai){
         if(!test_bit(this->get_true_target_area(m.current, player), m.target))
             return false;
     }
-    char old_piece = this->game_board[m.current];
+    char old_piece = this->game_board[m.target];
     ChangedAreas changes;
     if(check_legality(*this, m, player)){
         if(_reverse)
@@ -746,8 +760,10 @@ bool game::make_move(Move m, string player, bool _reverse, bool ai){
                 this->target_areas[m.target - 2] = 0;
                 // Remove Rook from initial
                 this->zobrist_val ^= PRN[TT_INDEXES[rook] + m.target - 2];
+                //cout<<"Remove rook at "<<m.target - 2<<endl;
                 // Fix rook at target
                 this->zobrist_val ^= PRN[TT_INDEXES[rook] + m.target + 1];
+                //cout<<"Fix rook at "<<m.target + 1<<endl;
 
             }
             else{
@@ -760,8 +776,10 @@ bool game::make_move(Move m, string player, bool _reverse, bool ai){
                 this->target_areas[m.target + 1] = 0;
                 // Remove Rook from initial
                 this->zobrist_val ^= PRN[TT_INDEXES[rook] + m.target + 1];
+                //cout<<"Remove rook at "<<m.target + 1<<endl;
                 // Fix rook at target
                 this->zobrist_val ^= PRN[TT_INDEXES[rook] + m.target - 1];
+                //cout<<"Fix rook at "<<m.target - 1<<endl;
             }
         }
         // For TT Castle Ref see line 40
@@ -800,11 +818,15 @@ bool game::make_move(Move m, string player, bool _reverse, bool ai){
         bool last_rank = (m.target < 64 && m.target > 55 && player == BLACK) || (m.target < 8 && m.target >= 0 && player == WHITE);
 
         if(last_rank){
-            if(!ai)
+            /// Remove Pawn From Zobrist Hash
+            this->zobrist_val ^= PRN[this->TT_INDEXES[this->game_board[m.target]] + m.current];
+            //cout<<"Remove Pawn(PP) @ "<<m.current<<endl;
+            if(!ai){
                 this->pawn_promotion = m.target;
-            else
+            }
+            else{
                 this->promote_pawn(m.target, ai_piece, player, true);
-
+            }
             return true;
         }
 
@@ -817,7 +839,8 @@ bool game::make_move(Move m, string player, bool _reverse, bool ai){
         if(initial_move){
             this->en_passant = m.target - dirn*8;
             this->zobrist_val ^= PRN[this->tt_en_passant_start + this->en_passant % 8];
-            //cout<<this->tt_en_passant_start + this->en_passant % 8<<" HASHED EN PASSANT\n";
+            //cout<<"Trigger En Passant @ "<<this->en_passant % 8<<" File\n";
+            ////cout<<this->tt_en_passant_start + this->en_passant % 8<<" HASHED EN PASSANT\n";
             //cout<<PRN[this->tt_en_passant_start + this->en_passant % 8]<<endl;
         }
         else
@@ -835,6 +858,7 @@ bool game::make_move(Move m, string player, bool _reverse, bool ai){
 
     /// Switch Player in zobrist
     this->zobrist_val ^= PRN[0];
+    //cout<<"Switched Players Zobrist\n";
     return true;
 }
 
@@ -960,13 +984,15 @@ class HashEntry{
     short depth;
     unsigned long long zobrist;
     long score;
+    Move BestMove;
     short type; /// 1 -> beta cutoff(>=score) , 0 -> exact evaluation(=score)
-    HashEntry(short _depth, unsigned long long _zobrist, short _type, long _score){
+    HashEntry(short _depth, unsigned long long _zobrist, short _type, long _score, Move _BestMove){
         this->depth = _depth;
         this->zobrist = _zobrist;
         this->type = _type;
         this->score = _score;
         this->ancient = false;
+        this->BestMove = _BestMove;
     }
     HashEntry(){
         this->ancient = true;
@@ -1055,10 +1081,15 @@ void game::initial_zobrist_hash(string player){
 
 void game::update_zobrist_val(short current, short target, char new_piece, char old_piece){
     this->zobrist_val ^= PRN[this->TT_INDEXES[new_piece] + current];
+    //cout<<"PRN @ "<<TT_INDEXES[new_piece] + current<<" Removing @ "<<current<<endl;
     this->zobrist_val ^= PRN[this->TT_INDEXES[new_piece] + target];
-    //cout<<this->TT_INDEXES[new_piece] + current<<" Current "<<this->TT_INDEXES[new_piece] + target<<endl;
-    if(old_piece != 'f')
+    //cout<<"PRN @ "<<TT_INDEXES[new_piece] + target<<" Placing @ "<<target<<endl;;
+    ////cout<<this->TT_INDEXES[new_piece] + current<<" Current "<<this->TT_INDEXES[new_piece] + target<<endl;
+    if(old_piece != 'f'){
         this->zobrist_val ^= PRN[this->TT_INDEXES[old_piece] + current];
+        //cout<<"PRN @ "<<TT_INDEXES[old_piece] + current<<" Removing(capture) "<<old_piece<<" @ "<<current<<endl;
+
+    }
 }
 
 long nodes = 0;
@@ -1275,12 +1306,15 @@ long negamax(game GameObj, string player, short depth, long alpha, long beta, bo
         depth_reset[depth] = true;
     }
 
+    bool found_pv = false;
+
     HashEntry this_state = trans_tables[GameObj.zobrist_val % HashSize];
     if(this_state.zobrist == GameObj.zobrist_val && use_tt){
         // Found an entry
         tt_saves++;
         trans_tables[GameObj.zobrist_val % HashSize].looked();
         if(this_state.depth >= depth){
+            found_pv = true;
             if(this_state.type == 0)
                 // Exact
                 return this_state.score;
@@ -1292,7 +1326,6 @@ long negamax(game GameObj, string player, short depth, long alpha, long beta, bo
                 beta = this_state.score;
             }
             else if(this_state.type == -1){
-                cout<<"HOWWWWWWWWWWWWWWWWWW?????????\n";
                 // Alpha cutoff
                 if(this_state.score <= alpha)
                     return this_state.score;
@@ -1310,11 +1343,31 @@ long negamax(game GameObj, string player, short depth, long alpha, long beta, bo
         if(val >= beta)
             return beta;
     }
-
-
     game tempObj;
+    Move BestMove;
+
     long val;
     vector<Move> moves = GameObj.get_all_moves(player, true, false, depth);
+    vector<Move> NewMoves;
+
+    bool use_pv = false;
+    if(!null_move && found_pv){
+        NewMoves.push_back(this_state.BestMove);
+        for(auto itr = moves.begin(); itr != moves.end(); itr++)
+            if(*itr == this_state.BestMove)
+                use_pv = true;
+            else
+                NewMoves.push_back(*itr);
+        if(!use_pv){
+            disp_board(GameObj.game_board);
+            cout<<endl<<this_state.BestMove;
+            cout<<"STOPPPPPPPPPPPPPPPPPP\n";
+            while(true){
+                cout<<".";
+            }
+        }
+    }
+
 
     for(auto i = moves.begin();i != moves.end(); i++){
         tempObj = game(GameObj);
@@ -1325,24 +1378,28 @@ long negamax(game GameObj, string player, short depth, long alpha, long beta, bo
             if(!GameObj.is_capture(i->current, i->target, player))
                 insert_killer(*i, depth);
             // Store beta cutoff
-            this_state = HashEntry(depth, GameObj.zobrist_val, 1, beta);
+            this_state = HashEntry(depth, GameObj.zobrist_val, 1, beta, *i);
             if(trans_tables[this_state.zobrist % HashSize].replace_hash(this_state))
                 trans_tables[this_state.zobrist % HashSize] = this_state;
             return beta;
         }
-        alpha = val > alpha ? val : alpha;
+        if(alpha < val){
+            alpha = val;
+            BestMove = *i;
+        }
+
     }
     if(alpha == -pow(10, 5)){
         // TODO(No Moves)
     }
 
-    this_state = HashEntry(depth, GameObj.zobrist_val, 0, alpha);
+    this_state = HashEntry(depth, GameObj.zobrist_val, 0, alpha, BestMove);
     if(trans_tables[this_state.zobrist % HashSize].replace_hash(this_state))
         trans_tables[this_state.zobrist % HashSize] = this_state;
     return alpha;
 }
 
-Move negamax_root(game GameObj, string player, short depth, vector<Move> &ordered_moves, bool use_tt, bool use_pv, long best_val = -pow(10, 5), Move best_move=Move(-1,-1)){
+Move negamax_root(game GameObj, string player, short depth, vector<Move> &ordered_moves, bool use_tt, bool use_pv, short &researches, long best_val = -pow(10, 5), Move best_move=Move(-1,-1)){
     /// Negamax Root Call
     long temp_val;
     vector<Move> moves;
@@ -1370,6 +1427,7 @@ Move negamax_root(game GameObj, string player, short depth, vector<Move> &ordere
             temp_val = -negamax(tempObj, reverse_player(player), depth - 1, -best_val - 1, -best_val, false, use_tt);
             if(best_val < temp_val){
                 // FWS (Re Search)
+                researches++;
                 temp_val = -negamax(tempObj, reverse_player(player), depth - 1, -pow(10, 5), -best_val, false, use_tt);
             }
         }
@@ -1405,24 +1463,26 @@ Move call_ai(game GameObj, string player, short depth){
 
     const bool use_tt = true;
 
+    short researches = 0;
+
     long best_val;
 
     Move best_move;
 
     if(depth > shallow_depth){
         // Order the moves according to shallow search & get best_val
-        best_move = negamax_root(GameObj, player, shallow_depth, ordered_moves, use_tt, false);
+        best_move = negamax_root(GameObj, player, shallow_depth, ordered_moves, use_tt, false, researches);
     }
     else
-        return negamax_root(GameObj, player, depth, ordered_moves, use_tt, false);
+        return negamax_root(GameObj, player, depth, ordered_moves, use_tt, false, researches);
 
     for(short current_depth = shallow_depth + 1; current_depth <= depth; current_depth++){
         sort(ordered_moves.begin(), ordered_moves.end(), comparer);
         best_val = ordered_moves[0].score;
         //cout<<best_val;
-        best_move = negamax_root(GameObj, player, current_depth, ordered_moves, use_tt, true, best_val, best_move);
+        best_move = negamax_root(GameObj, player, current_depth, ordered_moves, use_tt, true, researches, best_val, best_move);
     }
-    cout<<"Nodes "<<nodes<<' '<<tt_saves;
+    cout<<"Nodes "<<nodes<<' '<<tt_saves<<' '<<researches;
     return best_move;
 }
 
