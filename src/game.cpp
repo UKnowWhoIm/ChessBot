@@ -1361,7 +1361,7 @@ long negamax(game GameObj, string player, short depth, long alpha, long beta, bo
     vector<Move> NewMoves;
 
     bool use_pv = false;
-    if(!null_move && found_pv){
+    if(!null_move && found_pv && this_state.BestMove != Move(-1, -1)){
         NewMoves.push_back(this_state.BestMove);
         for(auto itr = moves.begin(); itr != moves.end(); itr++)
             if(*itr == this_state.BestMove)
@@ -1369,6 +1369,7 @@ long negamax(game GameObj, string player, short depth, long alpha, long beta, bo
             else
                 NewMoves.push_back(*itr);
         if(!use_pv){
+            // THIS WILL NEVER BE EXECUTED(IDEALLY)
             disp_board(GameObj.game_board);
             cout<<endl<<this_state.BestMove;
             cout<<player<<endl;
@@ -1384,19 +1385,31 @@ long negamax(game GameObj, string player, short depth, long alpha, long beta, bo
                 cout<<"`";
             }
         }
+        moves = NewMoves;
     }
-
+    bool pv_move = true;
 
     for(auto i = moves.begin();i != moves.end(); i++){
         tempObj = game(GameObj);
         tempObj.make_move(*i, player, false, true);
-        val = -negamax(tempObj, reverse_player(player), depth - 1, -beta, -alpha, null_move, use_tt);
+        if(pv_move || null_move || !found_pv)
+            // FWS
+            val = -negamax(tempObj, reverse_player(player), depth - 1, -beta, -alpha, null_move, use_tt);
+        else{
+            // ZWS
+            val = -negamax(tempObj, reverse_player(player), depth - 1, -alpha - 1, -alpha, null_move, use_tt);
+            if(val > alpha)
+                // FWS
+                val = -negamax(tempObj, reverse_player(player), depth - 1, -beta, -alpha, null_move, use_tt);
+        }
         if(val >= beta){
             // Non capture move that causes a beta cutoff = Killer Move
             if(!GameObj.is_capture(i->current, i->target, player))
                 insert_killer(*i, depth);
             // Store beta cutoff
             this_state = HashEntry(depth, GameObj.zobrist_val, 1, beta, *i);
+            if(null_move)
+                this_state.BestMove = Move(-1, -1);
             if(trans_tables[this_state.zobrist % HashSize].replace_hash(this_state))
                 trans_tables[this_state.zobrist % HashSize] = this_state;
             return beta;
@@ -1405,15 +1418,17 @@ long negamax(game GameObj, string player, short depth, long alpha, long beta, bo
             alpha = val;
             BestMove = *i;
         }
-
+        pv_move = false;
     }
     if(alpha == -pow(10, 5)){
         // TODO(No Moves)
     }
-
+    if(null_move)
+        BestMove = Move(-1, -1);
     this_state = HashEntry(depth, GameObj.zobrist_val, 0, alpha, BestMove);
     if(trans_tables[this_state.zobrist % HashSize].replace_hash(this_state))
         trans_tables[this_state.zobrist % HashSize] = this_state;
+
     return alpha;
 }
 

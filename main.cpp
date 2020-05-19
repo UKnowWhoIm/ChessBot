@@ -109,7 +109,7 @@ int main()
         }
         else{
             auto start = std::chrono::high_resolution_clock::now();
-            a = call_ai(GameObj, player, 5);
+            a = call_ai(GameObj, player, 7);
             auto stop = std::chrono::high_resolution_clock::now();
             auto duration = std::chrono::duration_cast<std::chrono::milliseconds>(stop - start);
             cout<<'\n'<<a.current<<' '<<a.target<<' '<<duration.count()<<endl;
