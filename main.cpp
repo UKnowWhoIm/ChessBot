@@ -85,9 +85,16 @@ int main()
     bool ai_only = true;
     bool play_game = true;
     bool multiplayer = true;
-    GameObj.initial_zobrist_hash(player);
-    //process_move_file(GameObj);
 
+    GameObj.initial_zobrist_hash(player);
+    /*
+    process_move_file(GameObj);
+    GameObj.make_move(Move(47, 30), WHITE, false, false);
+    disp_board(GameObj.game_board);
+    vector<Move> moves = GameObj.get_all_moves(WHITE, true, false);
+    for(auto a = moves.begin(); a != moves.end(); a++)
+        cout<<a->current<<' '<<a->target<<endl;
+        */
     while(!GameObj.game_over && play_game){
         disp_board(GameObj.game_board);
         cout<<"\n"<<player<<"\'s Turn";
@@ -108,8 +115,9 @@ int main()
             cout<<'\n'<<a.current<<' '<<a.target<<' '<<duration.count()<<endl;
             /**
             MOVE LOGGING
-            dump_move(player, a, duration.count());
             */
+            dump_move(player, a, duration.count());
+
             if(a == Move(-1, -1)){
                 // no moves
                 cout << "Stopped Because "<<player<<" returned -1,-1 as move";

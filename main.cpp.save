@@ -73,7 +73,7 @@ void get_status(game GameObj, string player){
 int main()
 {
     /// Initialize PRN
-    initialize_prn(true);
+    initialize_prn();
     game GameObj;
     string player = WHITE;
     const string human = WHITE;
@@ -82,13 +82,18 @@ int main()
     Move a;
     int target, current;
     bool status;
-    bool ai_only = false;
+    bool ai_only = true;
     bool play_game = true;
     bool multiplayer = true;
+    /*
     GameObj.initial_zobrist_hash(player);
-    //process_move_file(GameObj);
-    GameObj.make_move(Move(4, 31), BLACK, false, true);
-    GameObj.make_move()
+    process_move_file(GameObj);
+    GameObj.make_move(Move(47, 30), WHITE, false, false);
+    disp_board(GameObj.game_board);
+    vector<Move> moves = GameObj.get_all_moves(WHITE, true, false);
+    for(auto a = moves.begin(); a != moves.end(); a++)
+        cout<<a->current<<' '<<a->target<<endl;
+        */
     while(!GameObj.game_over && play_game){
         disp_board(GameObj.game_board);
         cout<<"\n"<<player<<"\'s Turn";
@@ -100,7 +105,6 @@ int main()
             target = convert_to_pos(notation_target);
             cout<<'\n'<<current<<' '<<target<<'\n';
             status = GameObj.make_move(Move(current, target), player, false, false);
-            //status = GameObj.make_move(Move(current, target), player, false, true);
         }
         else{
             auto start = std::chrono::high_resolution_clock::now();
@@ -108,8 +112,11 @@ int main()
             auto stop = std::chrono::high_resolution_clock::now();
             auto duration = std::chrono::duration_cast<std::chrono::milliseconds>(stop - start);
             cout<<'\n'<<a.current<<' '<<a.target<<' '<<duration.count()<<endl;
-
+            /**
+            MOVE LOGGING
+            */
             dump_move(player, a, duration.count());
+
             if(a == Move(-1, -1)){
                 // no moves
                 cout << "Stopped Because "<<player<<" returned -1,-1 as move";
@@ -118,6 +125,7 @@ int main()
             status = GameObj.make_move(a, player, false, true);
         }
         if(status){
+            cout<<endl<<"Zobrist "<<GameObj.zobrist_val<<endl;
             if(GameObj.pawn_promotion != -1){
                 char piece;
                 bool result = false;
@@ -128,7 +136,7 @@ int main()
                 }
 
             }
-            GameObj.update_status(player);
+            //GameObj.update_status(player);
 
             player = reverse_player(player);
         }

@@ -420,7 +420,7 @@ bool game::is_check(string player){
 
 void game::set_check(string player, unordered_map<short, bitset<64>> enemy_areas){
     short king_pos = find_king(this->game_board, player);
-
+    this->checked = false;
     if(king_pos == -1)
         return;
     for(auto itr = enemy_areas.begin(); itr != enemy_areas.end(); itr++)
@@ -444,12 +444,22 @@ void game::update_status(string player){
     }
 }
 
+unordered_map<short, bitset<64>> to_map(game GameObj, string player){
+    // Converts true target area of player into unordered map
+    unordered_map<short, bitset<64>> _map;
+    for(int i = 0; i < 64; i++)
+        if(get_player(GameObj.game_board[i]) == player)
+            _map[i] = GameObj.get_true_target_area(i, player);
+    return _map;
+}
+
 bool game::promote_pawn(int current, char piece, string player, bool ai=false){
     if(ai){
         // AI CALL
         this->game_board[current] = piece;
         this->target_areas[current] = get_valid_moves(this->game_board, current, player, this->white_castle, this->black_castle);
         this->zobrist_val ^= PRN[this->TT_INDEXES[piece] + current];
+        this->set_check(player, to_map(*this, reverse_player(player)));
         //cout<<"Added New Piece From Promotion @ "<<current<<endl;
         this->zobrist_val ^= PRN[0];
         //cout<<"Switch Player @ PP\n";
@@ -465,7 +475,7 @@ bool game::promote_pawn(int current, char piece, string player, bool ai=false){
             this->game_board[current] = piece;
             this->target_areas[current] = get_valid_moves(this->game_board, current, player, this->white_castle, this->black_castle);
             this->update_status(player);
-            this->checked = this->is_check(player);
+            this->set_check(player, to_map(*this, reverse_player(player)));
             this->zobrist_val ^= PRN[this->TT_INDEXES[piece] + current];
             //cout<<"Added New Piece From Promotion @ "<<current<<endl;
             this->zobrist_val ^= PRN[0];
@@ -1361,9 +1371,17 @@ long negamax(game GameObj, string player, short depth, long alpha, long beta, bo
         if(!use_pv){
             disp_board(GameObj.game_board);
             cout<<endl<<this_state.BestMove;
+            cout<<player<<endl;
+            cout<<GameObj.checked<<endl;
+            for(auto j = GameObj.checked_pieces.begin();j != GameObj.checked_pieces.end(); j++){
+                cout<<*j;
+            }
+            for(auto j = moves.begin();j != moves.end(); j++){
+                cout<<j->current<<' '<<j->target<<endl;
+            }
             cout<<"STOPPPPPPPPPPPPPPPPPP\n";
             while(true){
-                cout<<".";
+                cout<<"`";
             }
         }
     }
