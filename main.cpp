@@ -40,16 +40,20 @@ void process_move_file(game &GameObj){
     ifstream move_file(file_name);
     short current, target;
     long time;
-    Move previous;
     string player;
-    while(!move_file.eof()){
+    while(true){
         move_file >> player;
         move_file >> current;
         move_file >> target;
         move_file >> time;
-        if(previous != Move(current, target))
-            GameObj.make_move(Move(current, target), player, false, true);
-        previous = Move(current, target);
+
+        if(!GameObj.make_move(Move(current, target), player, false, true)){
+                cout<<endl<<Move(current, target)<<' '<<player;
+                disp_board(GameObj.game_board);
+
+        }
+        if(move_file.eof())
+            break;
     }
     move_file.close();
 }
@@ -73,6 +77,8 @@ void get_status(game GameObj, string player){
 int main()
 {
     /// Initialize PRN
+    ofstream move_file(file_name, std::ofstream::out | std::ofstream::trunc);
+    move_file.close();
     initialize_prn();
     game GameObj;
     string player = WHITE;
@@ -87,14 +93,9 @@ int main()
     bool multiplayer = true;
 
     GameObj.initial_zobrist_hash(player);
-    /*
-    process_move_file(GameObj);
-    GameObj.make_move(Move(47, 30), WHITE, false, false);
-    disp_board(GameObj.game_board);
-    vector<Move> moves = GameObj.get_all_moves(WHITE, true, false);
-    for(auto a = moves.begin(); a != moves.end(); a++)
-        cout<<a->current<<' '<<a->target<<endl;
-        */
+
+    //process_move_file(GameObj);
+
     while(!GameObj.game_over && play_game){
         disp_board(GameObj.game_board);
         cout<<"\n"<<player<<"\'s Turn";
@@ -109,7 +110,7 @@ int main()
         }
         else{
             auto start = std::chrono::high_resolution_clock::now();
-            a = call_ai(GameObj, player, 7);
+            a = call_ai(GameObj, player, 6);
             auto stop = std::chrono::high_resolution_clock::now();
             auto duration = std::chrono::duration_cast<std::chrono::milliseconds>(stop - start);
             cout<<'\n'<<a.current<<' '<<a.target<<' '<<duration.count()<<endl;
@@ -126,7 +127,6 @@ int main()
             status = GameObj.make_move(a, player, false, true);
         }
         if(status){
-            cout<<endl<<"Zobrist "<<GameObj.zobrist_val<<endl;
             if(GameObj.pawn_promotion != -1){
                 char piece;
                 bool result = false;
@@ -144,12 +144,10 @@ int main()
         else
             cout<<"\n\nERROR\n\n";
     }
-    cout<<endl<<endl;
+
     if(GameObj.winner == "")
         cout<<"Drawn";
     else
         cout<<GameObj.winner<<" Has Won";
-/*
-*/
     return 0;
 }

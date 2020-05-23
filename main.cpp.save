@@ -40,16 +40,20 @@ void process_move_file(game &GameObj){
     ifstream move_file(file_name);
     short current, target;
     long time;
-    Move previous;
     string player;
-    while(!move_file.eof()){
+    while(true){
         move_file >> player;
         move_file >> current;
         move_file >> target;
         move_file >> time;
-        if(previous != Move(current, target))
-            GameObj.make_move(Move(current, target), player, false, true);
-        previous = Move(current, target);
+
+        if(!GameObj.make_move(Move(current, target), player, false, true)){
+                cout<<endl<<Move(current, target)<<' '<<player;
+                disp_board(GameObj.game_board);
+
+        }
+        if(move_file.eof())
+            break;
     }
     move_file.close();
 }
@@ -73,6 +77,8 @@ void get_status(game GameObj, string player){
 int main()
 {
     /// Initialize PRN
+    ofstream move_file(file_name, std::ofstream::out | std::ofstream::trunc);
+    move_file.close();
     initialize_prn();
     game GameObj;
     string player = WHITE;
@@ -85,15 +91,19 @@ int main()
     bool ai_only = true;
     bool play_game = true;
     bool multiplayer = true;
-    /*
+
     GameObj.initial_zobrist_hash(player);
-    process_move_file(GameObj);
-    GameObj.make_move(Move(47, 30), WHITE, false, false);
-    disp_board(GameObj.game_board);
-    vector<Move> moves = GameObj.get_all_moves(WHITE, true, false);
-    for(auto a = moves.begin(); a != moves.end(); a++)
-        cout<<a->current<<' '<<a->target<<endl;
-        */
+
+    //ifstream r_file("dumpfile.dat", ios::in | ios::binary);
+    //r_file.read((char*)&GameObj, sizeof(GameObj));
+    //r_file.close();
+
+    //process_move_file(GameObj);
+    //disp_board(GameObj.game_board);
+    //cout<<GameObj.checked<<endl;
+    //vector<Move> moves = GameObj.get_all_moves(WHITE, true, false);
+    //for(auto i = moves.begin(); i != moves.end(); i++)
+    //    cout<<*i;
     while(!GameObj.game_over && play_game){
         disp_board(GameObj.game_board);
         cout<<"\n"<<player<<"\'s Turn";
@@ -108,7 +118,7 @@ int main()
         }
         else{
             auto start = std::chrono::high_resolution_clock::now();
-            a = call_ai(GameObj, player, 5);
+            a = call_ai(GameObj, player, 4);
             auto stop = std::chrono::high_resolution_clock::now();
             auto duration = std::chrono::duration_cast<std::chrono::milliseconds>(stop - start);
             cout<<'\n'<<a.current<<' '<<a.target<<' '<<duration.count()<<endl;
@@ -143,12 +153,21 @@ int main()
         else
             cout<<"\n\nERROR\n\n";
     }
+    //ofstream dump_file("dumpfile.dat", ios::out | ios::binary);
+
+    //dump_file.write((char*)&GameObj, sizeof(GameObj));
+    //dump_file.close();
     cout<<endl<<endl;
+
+//    vector<Move> moves = GameObj.get_all_moves(WHITE, true);
+    //for(auto i = moves.begin(); i != moves.end(); i++)
+    //    cout<<*i;
+    
+    disp_board(GameObj.get_true_target_area(BLACK));
+
     if(GameObj.winner == "")
         cout<<"Drawn";
     else
         cout<<GameObj.winner<<" Has Won";
-/*
-*/
     return 0;
 }

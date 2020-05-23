@@ -1,21 +1,4 @@
 #include "game.h"
-/*
-game::game(char board[64])
-{
-    //constructor
-    game_board = board
-    for(int i=0; i < 64; i++){
-        if(board[i] != 'f' &&
-            (board[i]) == WHITE)
-            white_occupied[i] = 1;
-        else if(board[i] != 'f' &&
-                    (board[i]) == BLACK)
-            black_occupied[i] = 1;
-    }
-
-}
-*/
-
 
 /**
 Random Num Array
@@ -322,6 +305,7 @@ game::game(const game &old){
     this->target_areas = old.target_areas;
     this->pawn_promotion = old.pawn_promotion;
     this->zobrist_val = old.zobrist_val;
+    this->checked_pieces = old.checked_pieces;
 }
 
 bitset<64> game::get_occupied(string player){
@@ -421,6 +405,7 @@ bool game::is_check(string player){
 void game::set_check(string player, unordered_map<short, bitset<64>> enemy_areas){
     short king_pos = find_king(this->game_board, player);
     this->checked = false;
+    this->checked_pieces.clear();
     if(king_pos == -1)
         return;
     for(auto itr = enemy_areas.begin(); itr != enemy_areas.end(); itr++)
@@ -444,22 +429,15 @@ void game::update_status(string player){
     }
 }
 
-unordered_map<short, bitset<64>> to_map(game GameObj, string player){
-    // Converts true target area of player into unordered map
-    unordered_map<short, bitset<64>> _map;
-    for(int i = 0; i < 64; i++)
-        if(get_player(GameObj.game_board[i]) == player)
-            _map[i] = GameObj.get_true_target_area(i, player);
-    return _map;
-}
-
 bool game::promote_pawn(int current, char piece, string player, bool ai=false){
     if(ai){
         // AI CALL
         this->game_board[current] = piece;
         this->target_areas[current] = get_valid_moves(this->game_board, current, player, this->white_castle, this->black_castle);
         this->zobrist_val ^= PRN[this->TT_INDEXES[piece] + current];
-        this->set_check(player, to_map(*this, reverse_player(player)));
+        unordered_map<short, bitset<64>> map_;
+        map_[current] = this->target_areas[current] & ~this->get_occupied(player);
+        this->set_check(player, map_);
         //cout<<"Added New Piece From Promotion @ "<<current<<endl;
         this->zobrist_val ^= PRN[0];
         //cout<<"Switch Player @ PP\n";
@@ -475,7 +453,9 @@ bool game::promote_pawn(int current, char piece, string player, bool ai=false){
             this->game_board[current] = piece;
             this->target_areas[current] = get_valid_moves(this->game_board, current, player, this->white_castle, this->black_castle);
             this->update_status(player);
-            this->set_check(player, to_map(*this, reverse_player(player)));
+            unordered_map<short, bitset<64>> map_;
+            map_[current] = this->target_areas[current] & ~this->get_occupied(player);
+            this->set_check(player, map_);
             this->zobrist_val ^= PRN[this->TT_INDEXES[piece] + current];
             //cout<<"Added New Piece From Promotion @ "<<current<<endl;
             this->zobrist_val ^= PRN[0];
@@ -508,7 +488,7 @@ int game::check_game_over(string player){
     vector<Move> moves = this->get_all_moves(player, false);
 
     if(moves.empty()){
-        if(this->is_check(player))
+        if(this->checked)
             return 1;
         return -1;
     }
@@ -649,10 +629,23 @@ bool check_legality(game GameObj, Move m, string player){
     if(king_pos == -1)
         /// Player's king is "captured"
         return false;
-    if(king_pos == m.current)
-        return !test_bit(GameObj.get_protected_area(reverse_player(player)), m.target);
+    bool king_move = king_pos == m.current;
+    if(king_move && test_bit(GameObj.get_protected_area(reverse_player(player)), m.target)){
+        /**
+        To prevent..
+        ...
+        .k.
+        ..b
+        Here (0, 0) is not in GameObj.ProtectedAreas at this state but move to there is illegal
+        So just cause target isn't in GameObj.ProtectedAreas, doesn't mean the move is legal..
+        So return !test_bit(GameObj.get_protected_area(reverse_player(player)), m.target) would be wrong
+        */
+        return false;
+    }
     game NewObj = game(GameObj);
     ChangedAreas areas = implement_move(NewObj, m, player);
+    if(king_move)
+        king_pos = m.target;
     for(auto i = areas.enemy_changed_areas.begin(); i != areas.enemy_changed_areas.end(); i++){
         if(test_bit(i->second, king_pos))
             return false;
@@ -661,9 +654,9 @@ bool check_legality(game GameObj, Move m, string player){
 }
 
 vector<Move> game::get_all_moves(string player, bool ai, bool capture_only, short depth){
-    if(this->checked){
+    if(this->checked)
         return this->check_move_generator(player);
-    }
+
     vector<Move> non_captures;
     vector<Move> captures;
     vector<Move> Killers;
@@ -859,8 +852,6 @@ bool game::make_move(Move m, string player, bool _reverse, bool ai){
     else
         this->en_passant = -1;
 
-    this->checked_pieces.clear();
-
     this->set_check(reverse_player(player), changes.player_changed_areas);
 
     /// Update position in zobrist(placed here to avoid cases of pawn promotion)
@@ -888,7 +879,7 @@ vector<short> generate_path(string board, short current, short target){
                 updation = 9 * ((target - current) / abs((target - current)));
         }
         if(tolower(board[current]) == 'q' || tolower(board[current]) == 'r'){
-            if(target % 8 == current % 8)
+            if(floor(target / 8) == floor(current / 8))
                 /// Horizontal
                 updation = (target - current) / abs((target - current));
             else if((target - current) % 8 == 0)
@@ -903,6 +894,8 @@ vector<short> generate_path(string board, short current, short target){
 
 
 vector<Move> game::check_move_generator(string player){
+
+
     vector<Move> non_captures;
     vector<Move> captures;
     short king_pos = find_king(this->game_board, player);
@@ -920,9 +913,14 @@ vector<Move> game::check_move_generator(string player){
         posns[k++] = 9;
     }
     for(short i=0; i<posns.size();i++){
-        if(king_pos + posns[i] < 63 && king_pos + posns[i] >= 0){
-            if(get_player(this->game_board[king_pos + posns[i]]) == player)
+
+        if(king_pos + posns[i] < 64 && king_pos + posns[i] >= 0){
+
+            //if(get_player(this->game_board[king_pos + posns[i]]) == player)
+            //    continue;
+            if(test_bit(this->get_occupied(player),king_pos + posns[i]))
                 continue;
+
             if(check_legality(*this, Move(king_pos, king_pos + posns[i]), player)){
                 if(is_capture(king_pos, king_pos + posns[i], player))
                     captures.push_back(Move(king_pos, king_pos + posns[i], piece_vals(this->game_board[i])));
@@ -931,6 +929,7 @@ vector<Move> game::check_move_generator(string player){
             }
         }
     }
+    //cout<<"\nSize: "<<this->checked_pieces.size()<<endl;
     if(this->checked_pieces.size() == 1){
         /// Capturing the piece or blocking the path
         short dirn;
@@ -1467,7 +1466,7 @@ Move negamax_root(game GameObj, string player, short depth, vector<Move> &ordere
 
         node = Move(temp->current, temp->target, temp_val);
         ordered_moves.push_back(node);
-        if(temp_val > best_val){
+        if(temp_val > best_val || best_move == Move(-1, -1)){
             best_move = node;
             best_val = temp_val;
         }
@@ -1492,7 +1491,7 @@ Move call_ai(game GameObj, string player, short depth){
         for(short j = 0; j < KillerSize; j++)
             KillerMoves[i][j] = Move(-1, -1);
 
-    const short shallow_depth = 3;
+    const short shallow_depth = 1;
 
     const bool use_tt = true;
 
@@ -1508,6 +1507,9 @@ Move call_ai(game GameObj, string player, short depth){
     }
     else
         return negamax_root(GameObj, player, depth, ordered_moves, use_tt, false, researches);
+    if(ordered_moves.size() == 0)
+        // Game Over
+        return Move(-1, -1);
 
     for(short current_depth = shallow_depth + 1; current_depth <= depth; current_depth++){
         sort(ordered_moves.begin(), ordered_moves.end(), comparer);
