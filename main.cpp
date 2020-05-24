@@ -77,8 +77,11 @@ void get_status(game GameObj, string player){
 int main()
 {
     /// Initialize PRN
-    ofstream move_file(file_name, std::ofstream::out | std::ofstream::trunc);
-    move_file.close();
+    bool LogMove = true;
+    if(LogMove){
+        ofstream move_file(file_name, std::ofstream::out | std::ofstream::trunc);
+        move_file.close();
+    }
     initialize_prn();
     game GameObj;
     string player = WHITE;
@@ -114,10 +117,11 @@ int main()
             auto stop = std::chrono::high_resolution_clock::now();
             auto duration = std::chrono::duration_cast<std::chrono::milliseconds>(stop - start);
             cout<<'\n'<<a.current<<' '<<a.target<<' '<<duration.count()<<endl;
-            /**
-            MOVE LOGGING
-            */
-            dump_move(player, a, duration.count());
+            if(LogMove)
+                /**
+                MOVE LOGGING
+                */
+                dump_move(player, a, duration.count());
 
             if(a == Move(-1, -1)){
                 // no moves
@@ -137,17 +141,27 @@ int main()
                 }
 
             }
-            //GameObj.update_status(player);
 
             player = reverse_player(player);
+
+            short GameStatus = GameObj.check_game_over(player);
+            if(GameStatus == 1){
+                /// Game is Lost
+                GameObj.game_over = true;
+                GameObj.winner = reverse_player(player);
+            }
+            else if(GameStatus == -1)
+                /// Game is Drawn
+                GameObj.game_over = true;
         }
         else
             cout<<"\n\nERROR\n\n";
     }
-
+    disp_board(GameObj.game_board);
+    cout<<endl;
     if(GameObj.winner == "")
         cout<<"Drawn";
     else
-        cout<<GameObj.winner<<" Has Won";
+        cout<<GameObj.winner<<" has won";
     return 0;
 }

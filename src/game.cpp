@@ -415,20 +415,6 @@ void game::set_check(string player, unordered_map<short, bitset<64>> enemy_areas
         }
 }
 
-
-void game::update_status(string player){
-    // Check For CheckMate Or Draw
-    int status = this->check_game_over(reverse_player(player));
-    if(status == 1){
-        this->game_over = true;
-        this->winner = player;
-    }
-    if(status == -1){
-        this->game_over = true;
-        this->winner = "";
-    }
-}
-
 bool game::promote_pawn(int current, char piece, string player, bool ai=false){
     if(ai){
         // AI CALL
@@ -452,7 +438,6 @@ bool game::promote_pawn(int current, char piece, string player, bool ai=false){
                 piece = tolower(piece);
             this->game_board[current] = piece;
             this->target_areas[current] = get_valid_moves(this->game_board, current, player, this->white_castle, this->black_castle);
-            this->update_status(player);
             unordered_map<short, bitset<64>> map_;
             map_[current] = this->target_areas[current] & ~this->get_occupied(player);
             this->set_check(player, map_);

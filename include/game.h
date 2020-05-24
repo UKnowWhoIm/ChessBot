@@ -85,7 +85,6 @@ class game
         bool is_check(string);
         bool is_capture(short, short, string);
         bool promote_pawn(int, char, string, bool);
-        void update_status(string);
         void set_check(string,  unordered_map<short, bitset<64>>);
         int en_passant;
         bool game_over;
