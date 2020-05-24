@@ -1305,6 +1305,29 @@ long quiescence_search(game GameObj, string player, long alpha, long beta, bool 
 
 }
 
+bool isWinning(game GameObj, string player){
+    // Calc individual scores
+    long PlayerScore = 0, EnemyScore = 0;
+    for(short i = 0; i < 64; i++)
+        if(get_player(GameObj.game_board[i]) == player)
+            PlayerScore += abs(piece_vals(GameObj.game_board[i]));
+        else if(get_player(GameObj.game_board[i]) == reverse_player(player))
+            EnemyScore += abs(piece_vals(GameObj.game_board[i]));
+    PlayerScore -= abs(piece_vals('K'));
+    EnemyScore -= abs(piece_vals('K'));
+    short cutoff = 1500;
+
+    // Only king is left
+    if(PlayerScore == 0)
+        return false;
+
+    // At least Queen along with a major piece is lost
+    if(EnemyScore - PlayerScore >= cutoff)
+        return false;
+
+    return true;
+}
+
 map<short, bool> depth_reset;
 
 long negamax(game GameObj, string player, short depth, long alpha, long beta, bool null_move, bool use_tt=true){
@@ -1360,6 +1383,7 @@ long negamax(game GameObj, string player, short depth, long alpha, long beta, bo
     vector<Move> NewMoves;
 
     bool use_pv = false;
+
     if(!null_move && found_pv && this_state.BestMove != Move(-1, -1)){
         NewMoves.push_back(this_state.BestMove);
         for(auto itr = moves.begin(); itr != moves.end(); itr++)
@@ -1368,6 +1392,10 @@ long negamax(game GameObj, string player, short depth, long alpha, long beta, bo
             else
                 NewMoves.push_back(*itr);
         if(!use_pv){
+            /// Hash Conflict or Bug
+            /// All searches would be FWS
+            found_pv = false;
+            /*
             // THIS WILL NEVER BE EXECUTED(IDEALLY)
             disp_board(GameObj.game_board);
             cout<<endl<<this_state.BestMove;
@@ -1383,11 +1411,13 @@ long negamax(game GameObj, string player, short depth, long alpha, long beta, bo
             while(true){
                 cout<<"`";
             }
+            */
         }
-        moves = NewMoves;
+        else
+            moves = NewMoves;
     }
-    bool pv_move = true;
 
+    bool pv_move = true;
     for(auto i = moves.begin();i != moves.end(); i++){
         tempObj = game(GameObj);
         tempObj.make_move(*i, player, false, true);
@@ -1421,6 +1451,10 @@ long negamax(game GameObj, string player, short depth, long alpha, long beta, bo
     }
     if(alpha == -pow(10, 5)){
         // TODO(No Moves)
+        // Not checked => Draw
+        if(!isWinning(GameObj, player) && !GameObj.checked)
+            // Losing the game -> promote this draw
+            return pow(10, 5);
     }
     if(null_move)
         BestMove = Move(-1, -1);
