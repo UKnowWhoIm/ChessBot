@@ -113,7 +113,7 @@ class game
 
 void disp_board(bitset<64>);
 void initialize_prn(bool=false);
-Move call_ai(game, string, short);
+Move call_ai(game, string, short, short &);
 
 // For debugging purposes only, Delete in production
 vector<short> generate_path(string, short, short);

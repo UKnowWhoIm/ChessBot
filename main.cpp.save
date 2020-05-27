@@ -113,7 +113,8 @@ int main()
         }
         else{
             auto start = std::chrono::high_resolution_clock::now();
-            a = call_ai(GameObj, player, 6);
+            short hash_conflicts = 0;
+            a = call_ai(GameObj, player, 7, hash_conflicts);
             auto stop = std::chrono::high_resolution_clock::now();
             auto duration = std::chrono::duration_cast<std::chrono::milliseconds>(stop - start);
             cout<<'\n'<<a.current<<' '<<a.target<<' '<<duration.count()<<endl;
@@ -141,8 +142,9 @@ int main()
                 }
 
             }
-            
+
             player = reverse_player(player);
+
             short GameStatus = GameObj.check_game_over(player);
             if(GameStatus == 1){
                 /// Game is Lost
@@ -158,6 +160,7 @@ int main()
     }
     disp_board(GameObj.game_board);
     cout<<endl;
+    cout<<"Hash Conflicts: "<<
     if(GameObj.winner == "")
         cout<<"Drawn";
     else

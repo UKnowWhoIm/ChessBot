@@ -82,6 +82,7 @@ int main()
         ofstream move_file(file_name, std::ofstream::out | std::ofstream::trunc);
         move_file.close();
     }
+    short hash_conflicts = 0;
     initialize_prn();
     game GameObj;
     string player = WHITE;
@@ -113,7 +114,7 @@ int main()
         }
         else{
             auto start = std::chrono::high_resolution_clock::now();
-            a = call_ai(GameObj, player, 6);
+            a = call_ai(GameObj, player, 7, hash_conflicts);
             auto stop = std::chrono::high_resolution_clock::now();
             auto duration = std::chrono::duration_cast<std::chrono::milliseconds>(stop - start);
             cout<<'\n'<<a.current<<' '<<a.target<<' '<<duration.count()<<endl;
@@ -159,6 +160,7 @@ int main()
     }
     disp_board(GameObj.game_board);
     cout<<endl;
+    cout<<"Hash Conflicts: "<<hash_conflicts<<endl;
     if(GameObj.winner == "")
         cout<<"Drawn";
     else

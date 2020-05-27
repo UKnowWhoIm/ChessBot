@@ -1315,7 +1315,7 @@ bool isWinning(game GameObj, string player){
 
 map<short, bool> depth_reset;
 
-long negamax(game GameObj, string player, short depth, long alpha, long beta, bool null_move, bool use_tt=true){
+long negamax(game GameObj, string player, short depth, long alpha, long beta, bool null_move, short &researches, short &hash_conflicts,bool use_tt=true){
     /// Reset the tt age ONLY once every depth
     if(!depth_reset[depth] && use_tt){
         for(int i = 0; i < HashSize  ; i++)
@@ -1356,7 +1356,7 @@ long negamax(game GameObj, string player, short depth, long alpha, long beta, bo
 
     // Null move pruning
     if(!null_move && check_null_move(GameObj, player) && depth > R){
-        int val = -negamax(GameObj, reverse_player(player), depth - R - 1, -beta, -beta + 10, true, use_tt);
+        int val = -negamax(GameObj, reverse_player(player), depth - R - 1, -beta, -beta + 10, true, researches, hash_conflicts, use_tt);
         if(val >= beta)
             return beta;
     }
@@ -1377,10 +1377,17 @@ long negamax(game GameObj, string player, short depth, long alpha, long beta, bo
             else
                 NewMoves.push_back(*itr);
         if(!use_pv){
-            /// Hash Conflict or Bug
+            /// Hash Conflict
             /// All searches would be FWS
             found_pv = false;
+            hash_conflicts++;
             /*
+            cout<<this_state.BestMove;
+            cout<<"Original Board\n";
+            disp_board(GameObj.game_board);
+            while(true)
+                cout<<"`";
+
             // THIS WILL NEVER BE EXECUTED(IDEALLY)
             disp_board(GameObj.game_board);
             cout<<endl<<this_state.BestMove;
@@ -1393,9 +1400,7 @@ long negamax(game GameObj, string player, short depth, long alpha, long beta, bo
                 cout<<j->current<<' '<<j->target<<endl;
             }
             cout<<"STOPPPPPPPPPPPPPPPPPP\n";
-            while(true){
-                cout<<"`";
-            }
+
             */
         }
         else
@@ -1408,13 +1413,15 @@ long negamax(game GameObj, string player, short depth, long alpha, long beta, bo
         tempObj.make_move(*i, player, false, true);
         if(pv_move || null_move || !found_pv)
             // FWS
-            val = -negamax(tempObj, reverse_player(player), depth - 1, -beta, -alpha, null_move, use_tt);
+            val = -negamax(tempObj, reverse_player(player), depth - 1, -beta, -alpha, null_move, researches, hash_conflicts, use_tt);
         else{
             // ZWS
-            val = -negamax(tempObj, reverse_player(player), depth - 1, -alpha - 1, -alpha, null_move, use_tt);
-            if(val > alpha)
-                // FWS
-                val = -negamax(tempObj, reverse_player(player), depth - 1, -beta, -alpha, null_move, use_tt);
+            val = -negamax(tempObj, reverse_player(player), depth - 1, -alpha - 1, -alpha, null_move, researches, hash_conflicts, use_tt);
+            if(val > alpha){
+                // FWS(Re Search)
+                researches++;
+                val = -negamax(tempObj, reverse_player(player), depth - 1, -beta, -alpha, null_move, researches, hash_conflicts, use_tt);
+            }
         }
         if(val >= beta){
             // Non capture move that causes a beta cutoff = Killer Move
@@ -1450,7 +1457,7 @@ long negamax(game GameObj, string player, short depth, long alpha, long beta, bo
     return alpha;
 }
 
-Move negamax_root(game GameObj, string player, short depth, vector<Move> &ordered_moves, bool use_tt, bool use_pv, short &researches, long best_val = -pow(10, 5), Move best_move=Move(-1,-1)){
+Move negamax_root(game GameObj, string player, short depth, vector<Move> &ordered_moves, bool use_tt, bool use_pv, short &researches, short &hash_conflicts, long best_val = -pow(10, 5), Move best_move=Move(-1,-1)){
     /// Negamax Root Call
     long temp_val;
     vector<Move> moves;
@@ -1471,15 +1478,15 @@ Move negamax_root(game GameObj, string player, short depth, vector<Move> &ordere
         tempObj.make_move(*temp, player, false, true);
         if(pv_move || !use_pv){
             // FWS
-            temp_val = -negamax(tempObj, reverse_player(player), depth - 1, -pow(10, 5), -best_val, false, use_tt);
+            temp_val = -negamax(tempObj, reverse_player(player), depth - 1, -pow(10, 5), -best_val, false, researches, hash_conflicts, use_tt);
         }
         else{
             // ZWS
-            temp_val = -negamax(tempObj, reverse_player(player), depth - 1, -best_val - 1, -best_val, false, use_tt);
+            temp_val = -negamax(tempObj, reverse_player(player), depth - 1, -best_val - 1, -best_val, false, researches, hash_conflicts, use_tt);
             if(best_val < temp_val){
                 // FWS (Re Search)
                 researches++;
-                temp_val = -negamax(tempObj, reverse_player(player), depth - 1, -pow(10, 5), -best_val, false, use_tt);
+                temp_val = -negamax(tempObj, reverse_player(player), depth - 1, -pow(10, 5), -best_val, false, researches, hash_conflicts, use_tt);
             }
         }
 
@@ -1495,7 +1502,7 @@ Move negamax_root(game GameObj, string player, short depth, vector<Move> &ordere
     return best_move;
 }
 
-Move call_ai(game GameObj, string player, short depth){
+Move call_ai(game GameObj, string player, short depth, short &hash_conflicts){
     nodes = 0;
     tt_saves = 0;
     vector<Move> ordered_moves;
@@ -1522,10 +1529,10 @@ Move call_ai(game GameObj, string player, short depth){
 
     if(depth > shallow_depth){
         // Order the moves according to shallow search & get best_val
-        best_move = negamax_root(GameObj, player, shallow_depth, ordered_moves, use_tt, false, researches);
+        best_move = negamax_root(GameObj, player, shallow_depth, ordered_moves, use_tt, false, researches, hash_conflicts);
     }
     else
-        return negamax_root(GameObj, player, depth, ordered_moves, use_tt, false, researches);
+        return negamax_root(GameObj, player, depth, ordered_moves, use_tt, false, researches, hash_conflicts);
     if(ordered_moves.size() == 0)
         // Game Over
         return Move(-1, -1);
@@ -1534,9 +1541,9 @@ Move call_ai(game GameObj, string player, short depth){
         sort(ordered_moves.begin(), ordered_moves.end(), comparer);
         best_val = ordered_moves[0].score;
         //cout<<best_val;
-        best_move = negamax_root(GameObj, player, current_depth, ordered_moves, use_tt, true, researches, best_val, best_move);
+        best_move = negamax_root(GameObj, player, current_depth, ordered_moves, use_tt, true, researches, hash_conflicts, best_val, best_move);
     }
-    cout<<"Nodes "<<nodes<<' '<<tt_saves<<' '<<researches;
+    cout<<"Nodes "<<nodes<<endl<<"TT Saves: "<<tt_saves<<endl<<"Re Searches: "<<researches<<endl;
     return best_move;
 }
 
